@@ -752,6 +752,106 @@ async function processTelegramUpdate(update) {
     );
 
     if (!result.rows.length) {
-  await sendTelegram(chatId, 'No pending applications.');
-  return;
+      await sendTelegram(chatId, 'No pending applications.');
+    } else {
+      for (const item of result.rows) {
+        await sendTelegram(
+          chatId,
+          `Pending application\nID: ${item.id}\nApplicant: ${item.first_name} ${item.last_name}\nPhone: ${item.phone}\nLoan: USD ${item.loan_amount} (${item.loan_term})`,
+          [[
+            { text: 'Approve', callback_data: `approve:${item.id}` },
+            { text: 'Reject', callback_data: `reject:${item.id}` }
+          ]]
+        );
       }
+    }
+  } else if (text.startsWith('/status ')) {
+    const id = text.split(/\s+/)[1];
+
+    if (!/^[0-9a-f-]{36}$/i.test(id || '')) {
+      await sendTelegram(chatId, 'Usage: /status APPLICATION_ID');
+      return;
+    }
+
+    const result = await pool.query(
+      'SELECT id,status,phone,first_name,last_name FROM applications WHERE id=$1',
+      [id]
+    );
+
+    const item = result.rows[0];
+
+    await sendTelegram(
+      chatId,
+      item
+        ? `Application status\nID: ${item.id}\nApplicant: ${item.first_name} ${item.last_name}\nPhone: ${item.phone}\nStatus: ${item.status}`
+        : 'Application not found.'
+    );
+  } else if (text === '/whoami') {
+    await sendTelegram(
+      chatId,
+      `Authorized chat ID: ${chatId}\nYour Telegram user ID: ${fromId}`
+    );
+  }
+}
+
+async function telegramPollLoop() {
+  if (telegramPolling || !BOT_TOKEN || !ADMIN_CHAT_ID) return;
+
+  telegramPolling = true;
+
+  while (true) {
+    try {
+      const updates = await telegramApi('getUpdates', {
+        offset: telegramOffset,
+        timeout: 20,
+        allowed_updates: ['message', 'callback_query']
+      });
+
+      for (const update of updates || []) {
+        telegramOffset = Math.max(
+          telegramOffset,
+          update.update_id + 1
+        );
+
+        try {
+          await processTelegramUpdate(update);
+        } catch (error) {
+          console.error(
+            'Telegram update processing failed:',
+            error.message
+          );
+        }
+      }
+    } catch (error) {
+      console.error(
+        'Telegram polling issue:',
+        error.message
+      );
+
+      await new Promise(resolve =>
+        setTimeout(resolve, 4000)
+      );
+    }
+  }
+}
+
+app.listen(PORT, async () => {
+  console.log(
+    `EcoCash application service listening on port ${PORT}`
+  );
+
+  try {
+    await dbReady;
+    console.log('Database is ready.');
+
+    if (BOT_TOKEN && ADMIN_CHAT_ID) {
+      telegramPollLoop();
+    }
+  } catch (error) {
+    console.error(
+      'Startup database check failed:',
+      error.message
+    );
+  }
+});
+  
