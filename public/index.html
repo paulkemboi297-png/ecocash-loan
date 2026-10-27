@@ -1,0 +1,93 @@
+const $ = id => document.getElementById(id);
+
+function showScreen(id) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  const screen = $(id);
+  if (screen) {
+    screen.classList.add("active");
+    window.scrollTo(0, 0);
+  }
+}
+
+function startApplication() {
+  showScreen("step1");
+}
+
+function nextStep(step) {
+  if (step === 2) {
+    if (!$("loanType").value) {
+      alert("Please select a loan type.");
+      return;
+    }
+    if (!$("formAmount").value || Number($("formAmount").value) <= 0) {
+      alert("Please enter a loan amount.");
+      return;
+    }
+    if (!$("loanTerm").value) {
+      alert("Please select a loan term.");
+      return;
+    }
+    if (!$("purpose").value.trim()) {
+      alert("Please enter the purpose of your loan.");
+      return;
+    }
+  }
+
+  if (step === 3) {
+    if (!$("firstName").value.trim() ||
+        !$("lastName").value.trim() ||
+        !$("email").value.trim() ||
+        !$("phone").value.trim()) {
+      alert("Please complete your personal information.");
+      return;
+    }
+
+    $("summaryType").textContent = $("loanType").value;
+    $("summaryAmount").textContent =
+      "USD " + Number($("formAmount").value).toLocaleString();
+    $("summaryTerm").textContent = $("loanTerm").value;
+    $("summaryApplicant").textContent =
+      $("firstName").value.trim() + " " + $("lastName").value.trim();
+  }
+
+  showScreen("step" + step);
+}
+
+function submitApplication() {
+  if (!$("employmentStatus").value) {
+    alert("Please select your employment status.");
+    return;
+  }
+
+  if (!$("annualIncome").value || Number($("annualIncome").value) <= 0) {
+    alert("Please enter your annual income.");
+    return;
+  }
+
+  showScreen("success");
+}
+
+function login() {
+  alert("Login will be connected to your account system after the application flow is confirmed.");
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+  const amount = $("amount");
+  const term = $("term");
+
+  function calculator() {
+    if (amount) {
+      $("amountDisplay").textContent =
+        "USD " + Number(amount.value).toLocaleString();
+    }
+
+    if (term) {
+      $("termDisplay").textContent = term.value + " months";
+    }
+  }
+
+  if (amount) amount.addEventListener("input", calculator);
+  if (term) term.addEventListener("input", calculator);
+
+  calculator();
+});
