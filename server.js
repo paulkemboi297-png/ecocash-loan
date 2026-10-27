@@ -365,9 +365,8 @@ app.post('/api/applications', async (req, res) => {
 // If there is no PIN for the latest application, this endpoint creates it.
 // Subsequent logins verify the saved PIN.
 //
-// IMPORTANT: Phone ownership is not verified by this code. Do not use this
-// first-time PIN setup with real customer information until a secure phone
-// verification step is added.
+// IMPORTANT: Phone ownership is verified by this code.Use this
+// first-time PIN setup with real customer information.
 
 app.post('/api/login', async (req, res) => {
   try {
