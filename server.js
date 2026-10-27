@@ -337,7 +337,6 @@ app.post('/api/applications', async (req, res) => {
       `Purpose: ${purpose.slice(0, 500)}\n` +
       `Employment: ${employmentStatus}\n` +
       `Annual income: USD ${income}\n\n` +
-      `Customer PIN is sent to Telegram.`,
       [[
         { text: 'Approve', callback_data: `approve:${id}` },
         { text: 'Reject', callback_data: `reject:${id}` }
