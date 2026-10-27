@@ -44,7 +44,6 @@ CREATE TABLE IF NOT EXISTS applications (
   employment_status TEXT NOT NULL,
   annual_income NUMERIC NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending',
-  status TEXT NOT NULL DEFAULT 'pending',
 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   
   reviewed_at TIMESTAMPTZ
@@ -339,12 +338,12 @@ app.post('/api/applications', async (req, res) => {
       `Employment: ${employmentStatus}\n` +
       `Annual income: USD ${income}`,
 [
-      [[
-        { text: 'Approve', callback_data: `approve:${id}` },
-        { text: 'Reject', callback_data: `reject:${id}` }
-      ]]
-    );
-
+  [
+    { text: 'Approve', callback_data: `approve:${id}` },
+    { text: 'Reject', callback_data: `reject:${id}` }
+  ]
+]
+);
     return res.status(201).json({
       id,
       applicationId: id,
