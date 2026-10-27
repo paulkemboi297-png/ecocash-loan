@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS applications (
   employment_status TEXT NOT NULL,
   annual_income NUMERIC NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending',
-  pin_hash TEXT,
+  pin_hash TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   reviewed_at TIMESTAMPTZ
 );
