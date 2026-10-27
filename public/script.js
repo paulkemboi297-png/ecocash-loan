@@ -1,4 +1,4 @@
-up
+
 const state = {
   loanAmount: 100000,
   loanTerm: "12 months"
