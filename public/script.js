@@ -1,4 +1,4 @@
-
+up
 const state = {
   loanAmount: 100000,
   loanTerm: "12 months"
@@ -270,13 +270,16 @@ async function submitApplication() {
   }
 }
 
+
 async function login() {
   const phone = normalizePhone($("loginPhone").value);
   const pin = $("loginPin").value.trim();
   const message = $("loginMessage");
+  const button = document.querySelector(
+    '#login button[onclick="login()"]'
+  );
 
   message.textContent = "";
-  message.style.color = "#c83737";
 
   if (!phone) {
     message.textContent = "Enter a valid Zimbabwe phone number.";
@@ -287,6 +290,9 @@ async function login() {
     message.textContent = "Enter your 4-digit PIN.";
     return;
   }
+
+  button.disabled = true;
+  button.textContent = "CHECKING...";
 
   try {
     const response = await fetch("/api/login", {
@@ -301,12 +307,61 @@ async function login() {
       throw new Error(data.error || "Login failed.");
     }
 
+    if (data.status === "rejected") {
+      message.style.color = "#c83737";
+      message.textContent =
+        data.message || "Your application was not approved. Please contact support.";
+      return;
+    }
+
+    if (data.status === "pending" && data.applicationId) {
+      message.style.color = "#0753a6";
+      message.textContent =
+        "⏳ Please wait. Our support team is reviewing your application...";
+
+      const applicationId = data.applicationId;
+
+      for (let attempt = 0; attempt < 120; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 5000));
+
+        const statusResponse = await fetch(
+          "/api/applications/" + encodeURIComponent(applicationId) + "/status"
+        );
+
+        if (!statusResponse.ok) continue;
+
+        const statusData = await statusResponse.json();
+
+        if (statusData.status === "approved") {
+          message.textContent =
+            "✅ Your application has been approved.";
+          return;
+        }
+
+        if (statusData.status === "rejected") {
+          message.style.color = "#c83737";
+          message.textContent =
+            "Your application was not approved. Please contact support.";
+          return;
+        }
+      }
+
+      message.textContent =
+        "Your application is still awaiting review. Please try again later.";
+      return;
+    }
+
     message.style.color = "#13834b";
     message.textContent = data.message || "Login successful.";
   } catch (error) {
+    message.style.color = "#c83737";
     message.textContent = error.message || "Login failed.";
+  } finally {
+    button.disabled = false;
+    button.textContent = "LOGIN";
   }
 }
+
 
 document.addEventListener("DOMContentLoaded", () => {
   if ($("amount")) {
