@@ -752,4 +752,6 @@ async function processTelegramUpdate(update) {
     );
 
     if (!result.rows.length) {
-      await sendTelegram(chatId, 'No pendin
+  await sendTelegram(chatId, 'No pending applications.');
+  return;
+      }
