@@ -237,7 +237,9 @@ app.post('/api/pin/setup', async (req, res) => {
     console.error('PIN setup failed:', e.message);
     res.status(500).json({ error: 'Could not save PIN.' });
   }
-});app.post('/api/login', async (req, res) => {
+});
+
+app.post('/api/login', async (req, res) => {
   try {
     await dbReady;
     const phone = normalizePhone(req.body?.phone);
@@ -477,5 +479,5 @@ app.listen(PORT, async () => {
   try {
     await dbReady;
   } catch {}
-  telegramPollLoop();
+  </script></body></html>`));
 });
