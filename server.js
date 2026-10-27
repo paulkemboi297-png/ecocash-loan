@@ -136,7 +136,9 @@ async function setApplicationStatus(id, status, source = 'admin') {
   const row = result.rows[0];
   await notifyTelegram(`Application ${status.toUpperCase()}\nID: ${row.id}\nApplicant: ${row.first_name} ${row.last_name}\nPhone: ${row.phone}\nUpdated by: ${source}`);
   return row;
-}app.get('/api/health', async (req, res) => {
+}
+
+app.get('/api/health', async (req, res) => {
   try {
     await dbReady;
     await pool.query('SELECT 1');
