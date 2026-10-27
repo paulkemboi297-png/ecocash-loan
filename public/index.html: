@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>EcoCash UI Prototype</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="app">
+    <!-- Screen 1 -->
+    <section class="screen active" id="screen1">
+      <div class="topbar">
+        <div class="brand"><span>Eco</span><b>Cash</b></div>
+      </div>
+      <div class="hero-card">
+        <h1>Get Your Loan Fast</h1>
+        <p class="sub">Quick approval • Low interest • Easy terms</p>
+
+        <div class="calculator">
+          <h2>Loan Calculator</h2>
+
+          <div class="row-label"><span>Loan Amount</span><strong id="amountLabel">USD 100,000</strong></div>
+          <input id="amount" type="range" min="100" max="500000" value="100000" step="100">
+
+          <div class="range-ends"><span>USD 100</span><span>USD 500K</span></div>
+
+          <div class="row-label term-label"><span>Loan Term</span><strong id="termLabel">months 12</strong></div>
+          <input id="term" type="range" min="6" max="60" value="12" step="1">
+
+          <div class="range-ends"><span>months 6</span><span>months 60</span></div>
+
+          <div class="payment"><span>Monthly Payment</span><strong id="paymentLabel">USD 9,504</strong></div>
+        </div>
+
+        <button class="primary" id="apply">APPLY NOW</button>
+
+        <div class="features">
+          <div><div class="emoji">⚡</div><b>Fast Approval</b><span>Within 24 hours</span></div>
+          <div><div class="emoji">💰</div><b>Low Interest</b><span>Starting from 8%</span></div>
+          <div><div class="emoji">🔒</div><b>Secure</b><span>Bank-level security</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Screen 2 -->
+    <section class="screen" id="screen2">
+      <header class="blue-header"><span class="back" data-back="1">← Back</span><div class="brand"><span>Eco</span><b>Cash</b></div><span class="menu">☰</span></header>
+      <div class="form-card">
+        <h1>Loan Application</h1><div class="step">Step 1 of 3</div>
+        <div class="progress"><i class="on"></i><i></i><i></i></div>
+
+        <label>Loan Type</label>
+        <select><option>Business Loan</option></select>
+
+        <label>Loan Amount (USD)</label>
+        <input id="formAmount" value="100000" inputmode="numeric">
+
+        <label>Loan Term</label>
+        <select><option>48 months</option><option>12 months</option><option>24 months</option><option>36 months</option><option>60 months</option></select>
+
+        <label>Loan Purpose</label>
+        <textarea id="purpose" placeholder="Describe the purpose of your loan..."></textarea>
+
+        <button class="primary" id="step1Next">NEXT STEP</button>
+      </div>
+    </section>
+
+    <!-- Screen 3 -->
+    <section class="screen" id="screen3">
+      <header class="blue-header"><span class="back" data-back="2">← Back</span><div class="brand"><span>Eco</span><b>Cash</b></div><span class="menu">☰</span></header>
+      <div class="form-card">
+        <h1>Loan Application</h1><div class="step">Step 2 of 3</div>
+        <div class="progress"><i class="done"></i><i class="on"></i><i></i></div>
+
+        <label>First Name</label><input id="firstName" placeholder="First name">
+        <label>Last Name</label><input id="lastName" placeholder="Last name">
+        <label>Email Address</label><input id="email" type="email" placeholder="email@example.com">
+        <label>Phone Number</label>
+        <div class="phone"><span>🇿🇼 +263</span><input id="phone" placeholder="771234567 or 0771234567" inputmode="numeric"></div>
+        <small>Enter 9 digits or start with 0 (example, 0712345678 → changes to 712345678)</small>
+
+        <div class="two-buttons"><button class="secondary" data-back="2">PREVIOUS</button><button class="primary" id="step2Next">NEXT STEP</button></div>
+      </div>
+    </section>
+
+    <!-- Screen 4 -->
+    <section class="screen" id="screen4">
+      <header class="blue-header"><span class="back" data-back="3">← Back</span><div class="brand"><span>Eco</span><b>Cash</b></div><span class="menu">☰</span></header>
+      <div class="form-card">
+        <h1>Loan Application</h1><div class="step">Step 3 of 3</div>
+        <div class="progress"><i class="done"></i><i class="done"></i><i class="on"></i></div>
+
+        <label>Employment Status</label><select><option>Self-Employed</option></select>
+        <label>Annual Income (USD)</label><input id="income" placeholder="Enter your annual income." inputmode="numeric">
+
+        <div class="summary">
+          <h2>Application Summary</h2>
+          <div><span>Loan Amount:</span><b id="sumAmount">USD 100,000</b></div>
+          <div><span>Loan Term:</span><b>48 months</b></div>
+          <div><span>Purpose:</span><b id="sumPurpose">Sggggg</b></div>
+          <div><span>Applicant:</span><b id="sumApplicant">Enock Ngetich</b></div>
+        </div>
+
+        <div class="two-buttons"><button class="secondary" data-back="3">PREVIOUS</button><button class="primary" id="submit">SUBMIT<br>APPLICATION</button></div>
+      </div>
+    </section>
+
+    <!-- Screen 5 -->
+    <section class="screen login-screen" id="screen5">
+      <div class="login-top">
+        <div class="brand"><span>Eco</span><b>Cash</b></div>
+        <p>Fast &amp; Easy Loans</p>
+      </div>
+      <div class="login-body">
+        <h1>Login to Account</h1>
+        <div class="phone login-phone"><span>🇿🇼 +263</span><input id="loginPhone" placeholder="771234567 or 0771234567"></div>
+        <p class="pin-title">Enter your PIN (4 digits)</p>
+        <div class="pins">
+          <input maxlength="1" inputmode="numeric"><input maxlength="1" inputmode="numeric"><input maxlength="1" inputmode="numeric"><input maxlength="1" inputmode="numeric">
+          <span>◉</span>
+        </div>
+        <div class="forgot">Forgot PIN?</div>
+        <button class="login-btn" id="loginBtn">LOGIN</button>
+      </div>
+      <footer><div class="brand"><span>Eco</span><b>Cash</b></div><p>Fast &amp; Easy Loans</p><small>v1.0.0</small></footer>
+    </section>
+  </main>
+  <div id="toast" class="toast"></div>
+  <script src="script.js"></script>
+</body>
+</html>
