@@ -1,0 +1,435 @@
+* {
+  box-sizing: border-box;
+  }
+
+body {
+margin: 0;
+font-family: Arial, Helvetica, sans-serif;
+background: #f4f7fb;
+color: #172033;
+}
+
+button,
+input,
+select,
+textarea {
+font: inherit;
+}
+
+button {
+cursor: pointer;
+}
+
+.app {
+min-height: 100vh;
+}
+
+.screen {
+display: none;
+min-height: 100vh;
+}
+
+.screen.active {
+display: block;
+}
+
+.header,
+.inner-header {
+display: flex;
+align-items: center;
+justify-content: space-between;
+padding: 18px 22px;
+background: #0753a6;
+color: white;
+}
+
+.header {
+box-shadow: 0 2px 10px rgba(0,0,0,.12);
+}
+
+.logo {
+font-size: 25px;
+font-weight: 800;
+letter-spacing: -.8px;
+}
+
+.logo span {
+color: white;
+}
+
+.logo b {
+color: #8bd4ff;
+}
+
+.header-login,
+.inner-header button {
+border: 1px solid rgba(255,255,255,.5);
+background: transparent;
+color: white;
+padding: 9px 15px;
+border-radius: 8px;
+font-weight: 700;
+}
+
+.hero {
+text-align: center;
+padding: 42px 20px 25px;
+background: linear-gradient(135deg, #0753a6, #0a73d6);
+color: white;
+}
+
+.hero h1 {
+margin: 0 0 10px;
+font-size: 34px;
+}
+
+.hero p {
+margin: 0;
+opacity: .92;
+}
+
+.calculator,
+.form-card,
+.login-card,
+.success-card {
+width: min(94%, 560px);
+margin: 22px auto;
+background: white;
+border-radius: 18px;
+padding: 24px;
+box-shadow: 0 5px 25px rgba(30,60,90,.10);
+}
+
+.calculator h2,
+.form-card h1,
+.success-card h1,
+.login-card h1 {
+margin-top: 0;
+}
+
+.calculator label {
+display: block;
+margin-top: 18px;
+font-weight: 700;
+}
+
+.amount-display {
+margin: 8px 0;
+font-size: 24px;
+font-weight: 800;
+color: #0753a6;
+}
+
+input[type="range"] {
+width: 100%;
+accent-color: #0753a6;
+}
+
+.range-labels {
+display: flex;
+justify-content: space-between;
+color: #68778a;
+font-size: 13px;
+}
+
+.payment {
+margin-top: 22px;
+padding: 17px;
+border-radius: 12px;
+background: #edf6ff;
+display: flex;
+justify-content: space-between;
+gap: 15px;
+}
+
+.payment strong {
+color: #0753a6;
+}
+
+.primary {
+display: block;
+width: min(94%, 560px);
+margin: 18px auto;
+padding: 15px 20px;
+border: 0;
+border-radius: 10px;
+background: #0753a6;
+color: white;
+font-weight: 800;
+font-size: 16px;
+box-shadow: 0 4px 12px rgba(7,83,166,.22);
+}
+
+.primary:hover {
+background: #06458c;
+}
+
+.features {
+width: min(94%, 560px);
+margin: 20px auto 35px;
+display: grid;
+grid-template-columns: repeat(3, 1fr);
+gap: 10px;
+}
+
+.features div {
+background: white;
+border-radius: 12px;
+padding: 16px 8px;
+text-align: center;
+box-shadow: 0 3px 15px rgba(30,60,90,.08);
+}
+
+.features b,
+.features span {
+display: block;
+}
+
+.features b {
+color: #0753a6;
+margin-bottom: 5px;
+}
+
+.features span {
+color: #68778a;
+font-size: 12px;
+}
+
+.form-card {
+margin-top: 25px;
+}
+
+.step-text {
+color: #68778a;
+margin-top: -8px;
+}
+
+.progress {
+display: flex;
+gap: 7px;
+margin: 18px 0 25px;
+}
+
+.progress i {
+height: 5px;
+flex: 1;
+border-radius: 10px;
+background: #dce4ec;
+}
+
+.progress i.on,
+.progress i.done {
+background: #0753a6;
+}
+
+.form-card label,
+.login-card label {
+display: block;
+margin: 16px 0 7px;
+font-weight: 700;
+}
+
+.form-card input,
+.form-card select,
+.form-card textarea,
+.login-card input {
+width: 100%;
+padding: 13px;
+border: 1px solid #ccd6e1;
+border-radius: 9px;
+outline: none;
+background: white;
+}
+
+.form-card input:focus,
+.form-card select:focus,
+.form-card textarea:focus,
+.login-card input:focus {
+border-color: #0753a6;
+box-shadow: 0 0 0 3px rgba(7,83,166,.10);
+}
+
+.form-card textarea {
+min-height: 105px;
+resize: vertical;
+}
+
+.phone-input {
+display: flex;
+align-items: center;
+border: 1px solid #ccd6e1;
+border-radius: 9px;
+overflow: hidden;
+background: white;
+}
+
+.phone-input span {
+padding: 13px 9px;
+background: #f1f5f9;
+white-space: nowrap;
+font-weight: 700;
+font-size: 14px;
+}
+
+.phone-input input {
+border: 0 !important;
+box-shadow: none !important;
+}
+
+.summary {
+margin-top: 22px;
+padding: 17px;
+border-radius: 12px;
+background: #f4f8fc;
+}
+
+.summary h2 {
+font-size: 18px;
+margin-top: 0;
+}
+
+.summary p {
+display: flex;
+justify-content: space-between;
+gap: 15px;
+border-bottom: 1px solid #e1e7ee;
+padding: 10px 0;
+margin: 0;
+}
+
+.summary p:last-child {
+border-bottom: 0;
+}
+
+.summary span {
+color: #68778a;
+}
+
+.success-card {
+text-align: center;
+margin-top: 70px;
+}
+
+.success-icon {
+width: 75px;
+height: 75px;
+margin: 0 auto 20px;
+border-radius: 50%;
+background: #13834b;
+color: white;
+display: flex;
+align-items: center;
+justify-content: center;
+font-size: 42px;
+font-weight: 800;
+}
+
+.success-card p {
+color: #68778a;
+line-height: 1.6;
+}
+
+.success-card .primary {
+width: 100%;
+}
+
+.login-screen {
+background: linear-gradient(135deg, #0753a6, #0a73d6);
+padding-top: 45px;
+}
+
+.login-card {
+max-width: 430px;
+text-align: center;
+}
+
+.login-card .logo {
+color: #0753a6;
+margin-bottom: 4px;
+}
+
+.login-card .logo span {
+color: #0753a6;
+}
+
+.login-card .logo b {
+color: #0791d1;
+}
+
+.login-card > p {
+color: #68778a;
+margin-top: 0;
+}
+
+.login-card label {
+text-align: left;
+}
+
+.login-card .phone-input {
+text-align: left;
+}
+
+.login-card .primary {
+width: 100%;
+margin-top: 25px;
+}
+
+.link-button {
+border: 0;
+background: transparent;
+color: #0753a6;
+font-weight: 700;
+margin-top: 8px;
+}
+
+.message {
+margin-top: 15px;
+color: #c83737;
+font-size: 14px;
+}
+
+.toast {
+position: fixed;
+left: 50%;
+bottom: 25px;
+transform: translateX(-50%) translateY(100px);
+background: #172033;
+color: white;
+padding: 13px 18px;
+border-radius: 9px;
+opacity: 0;
+transition: .25s;
+z-index: 100;
+max-width: 90%;
+text-align: center;
+}
+
+.toast.show {
+opacity: 1;
+transform: translateX(-50%) translateY(0);
+}
+
+@media (max-width: 500px) {
+.hero h1 {
+font-size: 28px;
+}
+
+.calculator,
+.form-card,
+.login-card,
+.success-card {
+padding: 19px;
+}
+
+.features {
+gap: 7px;
+}
+
+.features div {
+padding: 13px 5px;
+}
+
+.payment {
+flex-direction: column;
+}
+  }
