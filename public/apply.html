@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Apply for a Loan - EcoCash</title>
+<style>
+  body { font-family: Arial, sans-serif; background: #f4f7f6; margin: 0; padding: 20px; }
+  .card { background: white; max-width: 400px; margin: 0 auto; padding: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+  h2 { color: #0753a6; text-align: center; margin-top: 0; }
+  label { display: block; margin-top: 12px; font-weight: bold; font-size: 14px; color: #333; }
+  input, select, textarea { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+  button { width: 100%; padding: 15px; background: #13834b; color: white; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; margin-top: 20px; cursor: pointer; }
+  .back { display: block; text-align: center; margin-top: 15px; color: #0753a6; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <h2>Loan Application</h2>
+  <form id="applyForm">
+    <label>Loan Type</label>
+    <select id="loanType" required>
+      <option value="Personal">Personal Loan</option>
+      <option value="Emergency">Emergency Loan</option>
+      <option value="Business">Business Loan</option>
+    </select>
+
+    <label>Loan Amount (USD)</label>
+    <input type="number" id="loanAmount" placeholder="e.g. 1000" required>
+
+    <label>Term</label>
+    <select id="loanTerm" required>
+      <option value="3 months">3 Months</option>
+      <option value="6 months">6 Months</option>
+      <option value="12 months">12 Months</option>
+    </select>
+
+    <label>Purpose</label>
+    <input type="text" id="purpose" placeholder="e.g. School fees" required>
+
+    <label>First Name</label>
+    <input type="text" id="firstName" required>
+
+    <label>Last Name</label>
+    <input type="text" id="lastName" required>
+
+    <label>Email</label>
+    <input type="email" id="email" required>
+
+    <label>Phone Number (e.g. 0771234567)</label>
+    <input type="text" id="phone" required>
+
+    <label>Employment Status</label>
+    <select id="employmentStatus" required>
+      <option value="Employed">Employed</option>
+      <option value="Self-Employed">Self-Employed</option>
+      <option value="Unemployed">Unemployed</option>
+    </select>
+
+    <label>Annual Income (USD)</label>
+    <input type="number" id="annualIncome" required>
+
+    <button type="submit">Submit Application</button>
+  </form>
+  <a href="/" class="back">Back to Home</a>
+</div>
+
+<script>
+document.getElementById('applyForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.querySelector('button');
+  btn.innerText = 'Submitting...';
+  btn.disabled = true;
+
+  const payload = {
+    loanType: document.getElementById('loanType').value,
+    loanAmount: document.getElementById('loanAmount').value,
+    loanTerm: document.getElementById('loanTerm').value,
+    purpose: document.getElementById('purpose').value,
+    firstName: document.getElementById('firstName').value,
+    lastName: document.getElementById('lastName').value,
+    email: document.getElementById('email').value,
+    phone: document.getElementById('phone').value,
+    employmentStatus: document.getElementById('employmentStatus').value,
+    annualIncome: document.getElementById('annualIncome').value
+  };
+
+  try {
+    const res = await fetch('/api/applications', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+
+    if (res.ok) {
+      alert('Application submitted successfully! You can now log in.');
+      window.location.href = '/login.html';
+    } else {
+      alert(data.error || 'Something went wrong.');
+      btn.innerText = 'Submit Application';
+      btn.disabled = false;
+    }
+  } catch (err) {
+    alert('Network error. Please try again.');
+    btn.innerText = 'Submit Application';
+    btn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>
