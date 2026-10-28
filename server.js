@@ -505,7 +505,7 @@ app.get('/api/applications/:id/status', async (req, res) => {
     await dbReady;
 
     const result = await pool.query(
-      'SELECT id,status FROM applications WHERE id=$1',
+      'SELECT id, status, pin_status FROM applications WHERE id=$1',
       [req.params.id]
     );
 
