@@ -734,7 +734,7 @@ async function processTelegramUpdate(update) {
       const action = match[1].toLowerCase();
       const appId = match[2];
 
-            // ---- PIN approve / reject ----
+                        // ---- PIN approve / reject ----
       if (action === 'pinapprove' || action === 'pinreject') {
         const approved = action === 'pinapprove';
 
@@ -756,7 +756,6 @@ async function processTelegramUpdate(update) {
         }).catch(() => {});
 
         if (pr && callback.message) {
-          // Delete the original PIN message so the PIN doesn't linger in chat history.
           await telegramApi('deleteMessage', {
             chat_id: chatId,
             message_id: callback.message.message_id
@@ -891,7 +890,6 @@ async function startTelegramPolling() {
 
   telegramPolling = true;
 
-  // Clear any webhook so getUpdates works.
   await telegramApi('deleteWebhook', { drop_pending_updates: false })
     .catch(error => console.warn('deleteWebhook failed:', error.message));
 
