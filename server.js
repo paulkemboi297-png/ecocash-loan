@@ -568,7 +568,50 @@ async function processTelegramUpdate(update) {
     }
   }
 }
+// --- OTP LOGIC SETUP ---
+// (You can put this near the top of your file where you declare variables)
+let otpStore = {}; 
 
+// --- ROUTE 1: SEND OTP ---
+app.post('/api/send-otp', async (req, res) => {
+    const { phone } = req.body;
+    
+    // Generate a random 6-digit code
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // Save it in temporary memory
+    otpStore[phone] = otp;
+
+    // Send it to your Telegram bot using your existing helper
+    const message = `🚨 *New Login OTP* 🚨\n\n📱 Phone: ${phone}\n🔑 OTP Code: *${otp}*`;
+    
+    try {
+        // Assuming your telegramApi function takes (method, payload)
+        await telegramApi('sendMessage', {
+            chat_id: CHAT_ID, // Use whatever variable name you have for the chat ID
+            text: message,
+            parse_mode: 'Markdown'
+        });
+    } catch (error) {
+        console.error("Failed to send Telegram OTP:", error);
+    }
+
+    console.log(`[SMS MOCK] Send to ${phone}: Your OTP is ${otp}`);
+    res.json({ success: true, message: "OTP sent successfully" });
+});
+
+// --- ROUTE 2: VERIFY OTP ---
+app.post('/api/verify-otp', (req, res) => {
+    const { phone, otp } = req.body;
+    
+    // Check if the code matches what we saved
+    if (otpStore[phone] && otpStore[phone] === otp) {
+        delete otpStore[phone]; // Clear it after successful use
+        res.json({ success: true });
+    } else {
+        res.status(400).json({ success: false, error: "Invalid or expired OTP" });
+    }
+});
 // TELEGRAM POLLING SETUP
 
 async function pollTelegram() {
